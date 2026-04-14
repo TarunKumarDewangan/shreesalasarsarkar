@@ -935,3 +935,49 @@ input:checked + .slider:before {
   max-width: 200px;
   margin: 0 auto;
 }
+
+/* ─── Mobile / PWA Optimizations ────────────────────────────────────── */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-w: 280px; 
+    font-size: 16px; /* Better readability on mobile */
+  }
+
+  .btn, .nav-link, .search-item, .premium-search__item, .form-control {
+    min-height: 44px; /* Apple's minimum touch target */
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .modal {
+    width: 95%;
+    margin: 0 auto;
+    border-radius: var(--radius-lg);
+  }
+
+  .table-wrap {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Safe Area Insets for modern mobile notched screens */
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .sidebar {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Improve Pull-to-refresh behavior and overall feel */
+html {
+  overscroll-behavior-y: contain;
+}
+
+/* 58mm / 80mm Print Adjustments */
+@media print {
+  @page {
+    margin: 0;
+  }
+}
