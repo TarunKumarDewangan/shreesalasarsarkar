@@ -1,31 +1,51 @@
 {
+  "name":       "Shree Salasar Sarkar Finance",
   "short_name": "SSS Finance",
-  "name": "Shree Salasar Sarkar Finance",
+  "description": "Premium Finance Solutions — Loans, Recoveries & Reports.",
+  "start_url":  "/",
+  "scope":      "/",
+  "display":    "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "lang": "hi-IN",
   "icons": [
     {
-      "src": "favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src":     "pwa-icon.png",
+      "sizes":   "192x192",
+      "type":    "image/png",
       "purpose": "any"
     },
     {
-      "src": "pwa-icon.png",
-      "type": "image/png",
-      "sizes": "1024x1024",
+      "src":     "pwa-icon.png",
+      "sizes":   "512x512",
+      "type":    "image/png",
+      "purpose": "any"
+    },
+    {
+      "src":     "pwa-icon.png",
+      "sizes":   "1024x1024",
+      "type":    "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "pwa-icon.png",
-      "type": "image/png",
-      "sizes": "1024x1024",
+      "src":     "favicon.svg",
+      "sizes":   "any",
+      "type":    "image/svg+xml",
       "purpose": "any"
     }
   ],
-  "start_url": "/",
-  "background_color": "#ffffff",
-  "display": "standalone",
-  "scope": "/",
-  "theme_color": "#4f46e5",
-  "description": "Premium Finance Solutions for Businesses.",
-  "orientation": "portrait"
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url":  "/dashboard",
+      "icons": [{ "src": "pwa-icon.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Borrowers",
+      "url":  "/borrowers",
+      "icons": [{ "src": "pwa-icon.png", "sizes": "96x96", "type": "image/png" }]
+    }
+  ],
+  "categories": ["finance", "business"]
 }
