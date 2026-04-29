@@ -34,6 +34,9 @@ class InstallmentController extends Controller
             'notes'            => 'nullable|string',
             'receipt_no'       => 'nullable|string|max:50',
             'amount_collected' => 'nullable|numeric|min:0',
+            'strategy'         => 'nullable|string', // 'BAL' or 'AUTO_SPLIT'
+            'principal_amount' => 'nullable|numeric',
+            'interest_amount'  => 'nullable|numeric',
         ]);
 
         $user       = $request->user();
@@ -76,22 +79,25 @@ class InstallmentController extends Controller
             $installment, $data, $penalty, $discount, $amountCollected,
             $amountDue, $netDue, $generateReceipt, $request
         ) {
-            $receiptNo = $data['receipt_no'] ?? $generateReceipt();
+            $strategy = $data['strategy'] ?? 'AUTO_SPLIT';
+
             // Mark this installment PAID
             $installment->update([
-                'status'      => 'PAID',
-                'paid_date'   => $data['paid_date'],
-                'amount_paid' => min($amountCollected, $netDue),
-                'penalty'     => $penalty,
-                'discount'    => $discount,
-                'receipt_no'  => $receiptNo,
-                'method'      => strtoupper($data['method']),
-                'notes'       => $data['notes'] ?? null,
+                'status'           => 'PAID',
+                'paid_date'        => $data['paid_date'],
+                'amount_paid'      => ($strategy === 'BAL') ? $amountCollected : min($amountCollected, $netDue),
+                'principal_amount' => $data['principal_amount'] ?? $installment->principal_amount,
+                'interest_amount'  => $data['interest_amount'] ?? $installment->interest_amount,
+                'penalty'          => $penalty,
+                'discount'         => $discount,
+                'receipt_no'       => $receiptNo,
+                'method'           => strtoupper($data['method']),
+                'notes'            => $data['notes'] ?? null,
             ]);
 
-            // Cascade excess to next pending installments
+            // Cascade excess to next pending installments ONLY IF strategy is AUTO_SPLIT
             $excess = $amountCollected - $netDue;
-            if ($excess > 0.5) {
+            if ($excess > 0.5 && $strategy !== 'BAL') {
                 $nextInstallments = $installment->loan->installments()
                     ->where('status', '!=', 'PAID')
                     ->where('id', '!=', $installment->id)

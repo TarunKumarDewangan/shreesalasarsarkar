@@ -139,12 +139,17 @@ class BacklogController extends Controller
             'coverage' => 'nullable|string',
             'status' => 'nullable|string',
             'rate_per_day' => 'nullable|integer',
+            'strategy' => 'nullable|string', // 'BAL' or 'AUTO_SPLIT'
         ]);
 
         $installment = BacklogInstallment::findOrFail($id);
         
+        $strategy = $request->strategy ?? 'BAL';
+        $paidAmt = (float)$request->amount;
+        $emi = (float)$installment->installment_amount;
+        
         $installment->update([
-            'paid_amount' => $request->amount,
+            'paid_amount' => ($strategy === 'AUTO_SPLIT') ? $emi : $paidAmt,
             'payment_date' => $request->payment_date,
             'due_date' => $request->due_date ?: $installment->due_date,
             'mode' => $request->mode ?: $installment->mode,
@@ -153,11 +158,40 @@ class BacklogController extends Controller
             'interest_amount' => $request->interest_amount,
             'fine_amount' => $request->fine_amount,
             'exc_amount' => $request->exc_amount,
-            'coverage' => $request->coverage,
+            'coverage' => ($strategy === 'AUTO_SPLIT') ? floor($paidAmt / $emi) . ' Months' : ($request->coverage ?: '1 Month'),
             'status' => $request->status ?: 'PAID',
             'rate_per_day' => $request->rate_per_day,
             'cheque_no' => $request->cheque_no
         ]);
+
+        // If AUTO_SPLIT, generate next months
+        if ($strategy === 'AUTO_SPLIT' && $paidAmt > $emi) {
+            $excess = $paidAmt - $emi;
+            $currentDate = Carbon::parse($installment->due_date);
+            $payDate = $request->payment_date;
+            $rno = $request->rno;
+            $suffix = 1;
+
+            while ($excess >= $emi) {
+                $currentDate->addMonth();
+                $installment->backlogAccount->installments()->create([
+                    'fno' => $installment->fno,
+                    'installment_no' => 0, // Recalculated later
+                    'due_date' => $currentDate->toDateString(),
+                    'payment_date' => $payDate,
+                    'installment_amount' => $emi,
+                    'paid_amount' => $emi,
+                    'mode' => $request->mode ?: 'CASH',
+                    'rno' => $rno ? $rno . '-' . $suffix : null,
+                    'status' => 'PAID',
+                    'coverage' => '1 Month',
+                    'notes' => 'Auto-split from ' . ($rno ?: 'Ref'),
+                    'balance_amount' => 0, // Recalculated later
+                ]);
+                $excess -= $emi;
+                $suffix++;
+            }
+        }
 
         // Recalculate balance for this and subsequent installments
         $this->recalculateBalances($installment->backlog_account_id);
