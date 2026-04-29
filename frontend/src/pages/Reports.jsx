@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../api'
 import { Filter, TrendingUp, AlertCircle, CheckCircle2, Search, ArrowRight, Download, X } from 'lucide-react'
 import { fmtDate, fmtCurrency } from '../utils'
@@ -31,9 +32,10 @@ export default function Reports() {
     setLoading(true)
     api.get('/reports/recovery', { params: filters })
       .then(r => {
-        setData(r.data.data)
+        const borrowers = r.data.data.data || []
+        setData(borrowers)
         setStats(r.data.stats)
-        if (selected && !r.data.data.find(b => b.id === selected.id)) setSelected(null)
+        if (selected && !borrowers.find(b => b.id === selected.id)) setSelected(null)
       })
       .finally(() => setLoading(false))
   }
@@ -184,7 +186,10 @@ export default function Reports() {
             <button className="btn btn--outline btn--sm" style={{ height: 36 }} onClick={() => {
               const reset = { q: '', min_percent: '', max_percent: '', only_overdue: false, only_pending: false, only_completed: false, start_date: '', end_date: '' }
               setFilters(reset)
-              api.get('/reports/recovery', { params: reset }).then(r => { setData(r.data.data); setStats(r.data.stats); })
+              api.get('/reports/recovery', { params: reset }).then(r => { 
+                setData(r.data.data.data || []); 
+                setStats(r.data.stats); 
+              })
             }}>Reset</button>
           </div>
         </div>
@@ -225,7 +230,9 @@ export default function Reports() {
                         </td>
                         <td className="td-mono">{b.folio_prefix}-{b.folio_no}</td>
                         <td>
-                          <div style={{ fontWeight: 700 }}>{b.name}</div>
+                          <Link to={`/borrowers/${b.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                            <div style={{ fontWeight: 800, color: 'var(--primary)', cursor: 'pointer' }} className="hover:underline">{b.name}</div>
+                          </Link>
                           <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{b.mobile}</div>
                         </td>
                         <td className="td-mono">{b.vehicle?.vehicle_no || '—'}</td>

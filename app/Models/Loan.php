@@ -44,14 +44,19 @@ class Loan extends Model
         $rate   = $data['interest_rate'] ?? 0;
 
         $interest = ($gross * $rate * $months) / 1200;
-        $total    = $gross + $interest;
-        $emi      = $months > 0 ? $total / $months : 0;
+        $mathTotal = $gross + $interest;
+        
+        // Use ceil to round up if ANY decimal exists (even .0001)
+        $emi = $months > 0 ? ceil($mathTotal / $months) : 0;
+        
+        // The total contract sum must match the sum of rounded installments
+        $contractTotal = $emi * $months;
 
         return array_merge($data, [
             'gross_amount'     => round($gross, 2),
-            'interest_amount'  => round($interest, 2),
-            'total_amount'     => round($total, 2),
-            'installment_rate' => round($emi, 2),
+            'interest_amount'  => round($contractTotal - $gross, 2),
+            'total_amount'     => round($contractTotal, 2),
+            'installment_rate' => $emi,
         ]);
     }
 
@@ -75,6 +80,11 @@ class Loan extends Model
      */
     public function generateInstallments(): void
     {
+        // Safety: Do not regenerate if any installment is already PAID or SETTLED
+        if ($this->installments()->whereIn('status', ['PAID', 'SETTLED'])->exists()) {
+            return;
+        }
+
         $this->installments()->delete();
 
         $date = \Carbon\Carbon::parse($this->agreement_date);

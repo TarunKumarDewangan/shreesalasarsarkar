@@ -15,9 +15,7 @@ class LoanController extends Controller
         $user  = $request->user();
         $query = Loan::with(['borrower.vehicle', 'financer'])
             ->withCount([
-                'installments as total_installments',
-                'installments as paid_installments' => fn($q) => $q->where('status', 'PAID'),
-                'installments as pending_installments' => fn($q) => $q->where('status', 'PENDING')
+                'installments as total_installments'
             ])
             ->when(! $user->isAdmin(), function($q) use ($user) {
                 $ownerId = $user->isStaff() ? $user->financer_id : $user->id;
@@ -114,7 +112,7 @@ class LoanController extends Controller
 
     public function sendNotification(Request $request, Loan $loan)
     {
-        $this->authorizeAccess($request, $loan);
+        $this->authorize('view', $loan);
         
         if (!$loan->borrower || !$loan->borrower->mobile) {
             return response()->json(['message' => 'Borrower mobile number not found.'], 422);
@@ -131,7 +129,7 @@ class LoanController extends Controller
 
     public function approve(Request $request, Loan $loan)
     {
-        $this->authorizeAccess($request, $loan);
+        $this->authorize('update', $loan);
         $loan->update(['status' => 'ACTIVE']);
         
         if ($loan->installments()->count() === 0) {
@@ -147,14 +145,13 @@ class LoanController extends Controller
 
     public function reject(Request $request, Loan $loan)
     {
-        $this->authorizeAccess($request, $loan);
+        $this->authorize('update', $loan);
         $loan->update(['status' => 'REJECTED']);
         return response()->json(['message' => 'Loan rejected successfully.', 'loan' => $loan->load('borrower')]);
     }
 
     private function sendWhatsAppNotification(Loan $loan)
     {
-        $whatsApp = new WhatsAppService();
         $nextInstallment = $loan->installments()->where('status', 'PENDING')->orderBy('due_date')->first();
         $nextDate = $nextInstallment ? \Carbon\Carbon::parse($nextInstallment->due_date)->format('d-m-Y') : 'N/A';
         
@@ -165,21 +162,23 @@ class LoanController extends Controller
                "किस्त राशि: *₹" . number_format((float)$loan->installment_amount, 2) . "* (हर *" . ($loan->interval > 1 ? $loan->interval . " महीने" : "महीने") . "* में)\n\n" .
                "कंपनी: *Shree Salasar Sarkar Finance*\n" .
                "संपर्क: *90744466566*\n\n" .
-               "अपने खाते की जानकारी के लिए यहाँ क्लिक करें: http://localhost:5173/borrower/login\n" .
+               "अपने खाते की जानकारी के लिए यहाँ क्लिक करें: " . config('app.frontend_url', 'http://localhost:5173') . "/borrower/login\n" .
                "धन्यवाद!";
         
-        return $whatsApp->sendMessage($loan->borrower->mobile, $msg, $loan->financer_id);
+        \App\Jobs\SendWhatsAppNotification::dispatch($loan->borrower->mobile, $msg, $loan->financer_id);
+        
+        return ['success' => true, 'message' => 'Job dispatched'];
     }
 
     public function show(Request $request, Loan $loan)
     {
-        $this->authorizeAccess($request, $loan);
+        $this->authorize('view', $loan);
         return response()->json($loan->load(['borrower.guarantor', 'borrower.vehicle', 'installments', 'financer']));
     }
 
     public function update(Request $request, Loan $loan)
     {
-        $this->authorizeAccess($request, $loan);
+        $this->authorize('update', $loan);
 
         $data = $request->validate([
             'type'             => 'sometimes|in:CASH,ONLINE',
@@ -205,8 +204,18 @@ class LoanController extends Controller
             }
         }
 
+        $oldStatus = $loan->status;
         $loan->update($data);
         
+        // If reverted from FINAL/SEIZED to ACTIVE, reset SETTLED installments to PENDING
+        if (($oldStatus === 'FINAL' || $oldStatus === 'SEIZED' || $oldStatus === 'CLOSED') && $loan->status === 'ACTIVE') {
+            $loan->installments()->where('status', 'SETTLED')->update([
+                'status'    => 'PENDING',
+                'paid_date' => null,
+                'notes'     => null
+            ]);
+        }
+
         if ($changed) {
             $loan->generateInstallments();
         }
@@ -216,7 +225,7 @@ class LoanController extends Controller
 
     public function settle(Request $request, Loan $loan)
     {
-        $this->authorizeAccess($request, $loan);
+        $this->authorize('update', $loan);
 
         $request->validate([
             'collection_amount' => 'required|numeric|min:0',
@@ -242,7 +251,7 @@ class LoanController extends Controller
 
     public function destroy(Request $request, Loan $loan)
     {
-        $this->authorizeAccess($request, $loan);
+        $this->authorize('delete', $loan);
         
         $borrower = $loan->borrower;
         $loan->delete();
@@ -255,15 +264,5 @@ class LoanController extends Controller
         return response()->json(['message' => 'Loan record removed successfully.']);
     }
 
-    private function authorizeAccess(Request $request, Loan $loan): void
-    {
-        $user = $request->user();
-        if ($user->isAdmin()) return;
 
-        $effectiveOwnerId = $user->isStaff() ? $user->financer_id : $user->id;
-
-        if ($loan->financer_id !== $effectiveOwnerId) {
-            abort(403, 'Access denied.');
-        }
-    }
 }

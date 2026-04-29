@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BorrowerController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FinancerController;
 use App\Http\Controllers\Api\InstallmentController;
 use App\Http\Controllers\Api\LoanController;
@@ -33,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── FINANCER + ADMIN ──
     Route::get('borrowers/next-folio', [BorrowerController::class, 'nextFolio']);
+    Route::get('borrowers/onboarding-metadata', [BorrowerController::class, 'onboardingMetadata']);
     Route::get('borrowers/zones', [BorrowerController::class, 'zones']);
     Route::get('borrowers/vehicle-conditions', [BorrowerController::class, 'vehicleConditions']);
     Route::get('borrowers/vehicle-sold-by', [BorrowerController::class, 'vehicleSoldBy']);
@@ -56,44 +58,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/installments/{installment}/unpay',[InstallmentController::class, 'markPending']);
 
     // Dashboard stats
-    Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
-        $user = $request->user();
-        $borrowerQ     = \App\Models\Borrower::query();
-        $loanQ         = \App\Models\Loan::query();
-        $installmentQ  = \App\Models\Installment::query();
-
-        if ($user->isStaff()) {
-            $financerId = $user->financer_id;
-            $staffId = $user->id;
-            $borrowerQ->where('financer_id', $financerId)->where('recovery_man_id', $staffId);
-            $loanQ->where('financer_id', $financerId)->whereHas('borrower', function($q) use ($staffId) {
-                $q->where('recovery_man_id', $staffId);
-            });
-        } elseif ($user->isFinancer()) {
-            $borrowerQ->where('financer_id', $user->id);
-            $loanQ->where('financer_id', $user->id);
-        }
-
-        $loanIds = $loanQ->pluck('id');
-        $installmentQ->whereIn('loan_id', $loanIds);
-
-        return response()->json([
-            'total_borrowers'       => $borrowerQ->count(),
-            'active_loans'          => (clone $loanQ)->where('status', 'ACTIVE')->count(),
-            'pending_installments'  => (clone $installmentQ)->where('status', 'PENDING')->count(),
-            'collected_this_month'  => (clone $installmentQ)
-                ->where('status', 'PAID')
-                ->whereMonth('paid_date', now()->month)
-                ->whereYear('paid_date', now()->year)
-                ->sum('amount_paid'),
-            'collected_today'       => (clone $installmentQ)
-                ->where('status', 'PAID')
-                ->whereDate('paid_date', now()->toDateString())
-                ->sum('amount_paid'),
-        ]);
-    });
+    Route::get('/dashboard', [DashboardController::class, 'index']);
 
     Route::get('/reports/recovery', [\App\Http\Controllers\Api\ReportController::class, 'recovery']);
+    Route::get('/reports/individual-balance/{borrower}', [\App\Http\Controllers\Api\ReportController::class, 'individualBalance']);
 
     // Staff / Recovery Men (For Financer)
     Route::get('recovery-men', [\App\Http\Controllers\Api\StaffController::class, 'recoveryMen']);
@@ -114,4 +82,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/trash', [\App\Http\Controllers\Api\TrashController::class, 'index']);
     Route::post('/trash/{type}/{id}/restore', [\App\Http\Controllers\Api\TrashController::class, 'restore']);
     Route::delete('/trash/{type}/{id}/force', [\App\Http\Controllers\Api\TrashController::class, 'forceDelete']);
+
+    // Backlog Management
+    Route::get('/backlog', [\App\Http\Controllers\Api\BacklogController::class, 'index']);
+    Route::get('/backlog/{id}', [\App\Http\Controllers\Api\BacklogController::class, 'show']);
+    Route::post('/backlog/upload-accounts', [\App\Http\Controllers\Api\BacklogController::class, 'uploadAccounts']);
+    Route::post('/backlog/upload-installments', [\App\Http\Controllers\Api\BacklogController::class, 'uploadInstallments']);
+    Route::delete('/backlog/clear', [\App\Http\Controllers\Api\BacklogController::class, 'destroy']);
+    Route::post('/backlog/{id}/payment', [\App\Http\Controllers\Api\BacklogController::class, 'addPayment']);
+    Route::patch('/backlog-installments/{id}', [\App\Http\Controllers\Api\BacklogController::class, 'updateInstallment']);
+    Route::delete('/backlog-installments/{id}', [\App\Http\Controllers\Api\BacklogController::class, 'deleteInstallment']);
+    Route::post('/backlog/{id}/settle', [\App\Http\Controllers\Api\BacklogController::class, 'settle']);
+    Route::post('/backlog/{id}/recalculate', [\App\Http\Controllers\Api\BacklogController::class, 'recalculateAll']);
 });

@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, CreditCard, BarChart2,
   LogOut, Building2, Menu, X, CheckCircle, ShieldAlert,
-  MessageSquare, Trash2
+  MessageSquare, Trash2, Clock
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -12,6 +12,7 @@ const adminNav = [
   { to: '/admin/financers', icon: Building2,        label: 'Financers' },
   { to: '/whatsapp',        icon: MessageSquare,    label: 'WhatsApp API' },
   { to: '/customers',       icon: Users,            label: 'Personal Details' },
+  { to: '/backlog',         icon: Clock,            label: 'Backlog' },
   { to: '/trash',           icon: Trash2,           label: 'Trash Bin' },
 ]
 
@@ -26,6 +27,7 @@ const financerNav = [
   { to: '/reports',   icon: BarChart2,        label: 'Reports' },
   { to: '/whatsapp',  icon: MessageSquare,    label: 'WhatsApp' },
   { to: '/customers', icon: Users,            label: 'Personal Details' },
+  { to: '/backlog',   icon: Clock,            label: 'Backlog' },
   { to: '/trash',     icon: Trash2,           label: 'Trash Bin' },
 ]
 

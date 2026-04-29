@@ -6,6 +6,7 @@ import {
   User, Car, CreditCard, Users, Phone, ShieldCheck, MapPin, Calendar, Hash
 } from 'lucide-react'
 import { fmtDate, fmtCurrency } from '../utils'
+import { useAuth } from '../contexts/AuthContext'
 
 /* ── helpers ─────────────────────────────── */
 const toN = v => Number(v || 0)
@@ -13,9 +14,12 @@ const toN = v => Number(v || 0)
 function calcLoan(financeAmt, agreementAmt, hpRto, months, rate) {
   const gross    = toN(financeAmt) + toN(agreementAmt) + toN(hpRto)
   const interest = (gross * toN(rate) * toN(months)) / 1200
-  const total    = gross + interest
-  const emi      = toN(months) > 0 ? total / toN(months) : 0
-  return { gross, interest, total, emi }
+  const mathTotal = gross + interest
+  const actualEmi = toN(months) > 0 ? mathTotal / toN(months) : 0
+  const emi      = Math.ceil(actualEmi)
+  // Total sum should be exactly the sum of installments
+  const total    = emi * toN(months)
+  return { gross, interest, total, emi, actualEmi, mathTotal }
 }
 
 async function compressImage(file, maxSizeKB = 100) {
@@ -62,6 +66,7 @@ async function compressImage(file, maxSizeKB = 100) {
 }
 
 export default function CombinedEntry() {
+  const { isAdmin } = useAuth()
   const [data, setData] = useState({
     folio_prefix: 'O',
     folio_no: '',
@@ -114,56 +119,34 @@ export default function CombinedEntry() {
     const fetchMetadata = async (financerId = null) => {
       const params = financerId ? { financer_id: financerId } : {}
       try {
-        const [cRes, sRes, mRes, colorRes, zRes] = await Promise.all([
-          api.get('/borrowers/vehicle-conditions', { params }).catch(() => ({ data: [] })),
-          api.get('/borrowers/vehicle-sold-by', { params }).catch(() => ({ data: [] })),
-          api.get('/borrowers/vehicle-models', { params }).catch(() => ({ data: [] })),
-          api.get('/borrowers/vehicle-colors', { params }).catch(() => ({ data: [] })),
-          api.get('/borrowers/zones', { params }).catch(() => ({ data: [] }))
-        ])
+        const res = await api.get('/borrowers/onboarding-metadata', { params })
+        const m = res.data;
         setData(d => ({ 
           ...d, 
-          conditions: cRes.data || [],
-          sold_by_list: sRes.data || [],
-          models: mRes.data || [],
-          colors: colorRes.data || [],
-          zones: zRes.data || []
+          folio_no: m.next_folio,
+          conditions: m.conditions || [],
+          sold_by_list: m.sold_by || [],
+          models: m.models || [],
+          colors: m.colors || [],
+          zones: m.zones || [],
+          financers: m.financers?.length ? m.financers : d.financers, // Update financers only if provided
+          financer_id: (m.financers?.length === 1 && !d.financer_id) ? m.financers[0].id : d.financer_id
         }))
-      } catch (e) { console.error('Metadata fetch failed', e) }
+      } catch (e) { 
+        console.error('Metadata fetch failed', e) 
+      } finally {
+        setLoading(false)
+      }
     }
 
     useEffect(() => {
       if (data.financer_id) {
         fetchMetadata(data.financer_id)
-        // Re-fetch next folio for this specific financer
-        api.get('/borrowers/next-folio', { params: { financer_id: data.financer_id } })
-          .then(res => setData(d => ({ ...d, folio_no: res.data.next })))
-          .catch(err => console.error('Next folio fetch failed', err))
       }
     }, [data.financer_id])
 
     useEffect(() => {
-      // Fetch next folio and financers
-      const init = async () => {
-        try {
-          const [fRes, finRes] = await Promise.all([
-            api.get('/borrowers/next-folio'),
-            api.get('/financers').catch(() => ({ data: [] })),
-          ])
-          setData(d => ({ 
-            ...d, 
-            folio_no: fRes.data.next,
-            financers: finRes.data || [],
-          }))
-          // Initial fetch for non-admin or default
-          fetchMetadata()
-        } catch (e) {
-          console.error('Init failed', e)
-        } finally {
-          setLoading(false)
-        }
-      }
-      init()
+      fetchMetadata()
     }, [])
 
   const set = k => e => {
@@ -188,7 +171,7 @@ export default function CombinedEntry() {
     setActiveTab(0)
   }
 
-  const { gross, interest, total, emi } = calcLoan(
+  const { gross, interest, total, emi, actualEmi, mathTotal } = calcLoan(
     data.finance_amount, data.agreement_amount, data.hire_purchase_rto,
     data.total_months, data.interest_rate
   )
@@ -325,7 +308,7 @@ export default function CombinedEntry() {
                       </div>
                       <div className="entry-card">
                         <label>Dealer / Financer</label>
-                        <select className="form-control form-control--sm" value={data.financer_id} onChange={set('financer_id')}>
+                        <select className="form-control form-control--sm" value={data.financer_id} onChange={set('financer_id')} disabled={!isAdmin && (data.financers || []).length <= 1}>
                           <option value="">Select Dealer</option>
                           {(data.financers || []).map(f => (
                             <option key={f.id} value={f.id}>{f.finance_name || f.name}</option>
@@ -500,6 +483,7 @@ export default function CombinedEntry() {
                       <div>
                         <label className="form-label--xs" style={{ color: 'var(--text-muted)' }}>TOTAL CONTRACT SUM</label>
                         <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--primary)' }}>₹{fmtCurrency(total)}</div>
+                        <div style={{ fontSize: 10, opacity: 0.6, color: '#64748b', fontWeight: 600 }}>Actual: ₹{mathTotal.toFixed(2)}</div>
                       </div>
                     </div>
                   </div>
@@ -651,11 +635,17 @@ export default function CombinedEntry() {
               </div>
               <div className="hub-row" style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--border)' }}>
                 <span>EMI</span>
-                <span style={{ color: 'var(--primary)' }}>₹{fmtCurrency(emi * toN(data.interval || 1))}</span>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: 'var(--primary)', fontWeight: 800 }}>₹{fmtCurrency(emi * toN(data.interval || 1))}</div>
+                  <div style={{ fontSize: 9, opacity: 0.6, color: '#64748b' }}>Actual: ₹{(actualEmi * toN(data.interval || 1)).toFixed(3)}</div>
+                </div>
               </div>
               <div className="hub-row">
                 <span style={{ fontSize: 14 }}>Total Sum</span>
-                <span style={{ color: 'var(--primary)', fontSize: 18, fontWeight: 800 }}>₹{fmtCurrency(total)}</span>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: 'var(--primary)', fontSize: 18, fontWeight: 800 }}>₹{fmtCurrency(total)}</div>
+                  <div style={{ fontSize: 9, opacity: 0.6, color: '#64748b' }}>Actual: ₹{mathTotal.toFixed(2)}</div>
+                </div>
               </div>
             </div>
 

@@ -1,5 +1,5 @@
 // ── SSS Finance Service Worker ──────────────────────────────────────────────
-const APP_VERSION   = 'v2';
+const APP_VERSION   = 'v3';
 const CACHE_SHELL   = `sss-shell-${APP_VERSION}`;
 const CACHE_DYNAMIC = `sss-dynamic-${APP_VERSION}`;
 
@@ -38,22 +38,20 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // 1. API requests → Network first, no cache fallback (always fresh data)
-  if (url.pathname.startsWith('/api') || url.hostname.includes('api.shreesalasarsarkarfin.com')) {
-    event.respondWith(
-      fetch(request).catch(() => new Response(
-        JSON.stringify({ error: 'You are offline. Please check your connection.' }),
-        { status: 503, headers: { 'Content-Type': 'application/json' } }
-      ))
-    );
-    return;
+  // 1. API requests → Pass through directly. Do NOT intercept with event.respondWith()
+  //    Intercepting causes every API call to be made TWICE (original + SW fetch).
+  if (
+    url.pathname.startsWith('/api') ||
+    url.hostname.includes('api.shreesalasarsarkarfin.com') ||
+    request.method !== 'GET'
+  ) {
+    return; // Let browser handle it natively — no double-fetch
   }
 
   // 2. HTML navigation requests → Network first, fallback to cached /index.html (SPA)
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .catch(() => caches.match('/index.html'))
+      fetch(request).catch(() => caches.match('/index.html'))
     );
     return;
   }
@@ -63,7 +61,6 @@ self.addEventListener('fetch', (event) => {
     caches.match(request).then((cached) => {
       if (cached) return cached;
       return fetch(request).then((response) => {
-        // Cache valid responses for static assets
         if (response && response.status === 200 && response.type === 'basic') {
           const cloned = response.clone();
           caches.open(CACHE_DYNAMIC).then((cache) => cache.put(request, cloned));

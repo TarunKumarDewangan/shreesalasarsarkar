@@ -261,8 +261,8 @@ export default function Borrowers() {
       .finally(() => setLoading(false))
   }
   useEffect(() => {
-    loadStaff()
-    loadZones()
+    // Run both in parallel instead of sequentially
+    Promise.all([loadStaff(), loadZones()])
   }, [])
 
   useEffect(() => {
@@ -277,6 +277,13 @@ export default function Borrowers() {
   }
 
   useEffect(() => {
+    if (selected?.id && !selected.latest_loan?.total_installments) {
+      // If we don't have full details (e.g. from the main list), fetch them
+      api.get(`/borrowers/${selected.id}`).then(r => {
+        setSelected(r.data)
+      })
+    }
+
     if (selected?.latest_loan) {
       setInsLoading(true)
       api.get(`/loans/${selected.latest_loan.id}/installments`)
@@ -472,7 +479,9 @@ export default function Borrowers() {
                         <span className="td-mono">{b.folio_prefix}-{b.folio_no}</span>
                       </td>
                       <td data-label="Name">
-                        <div style={{ fontWeight: 600 }}>{b.name}</div>
+                        <Link to={`/borrowers/${b.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                          <div style={{ fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }} className="hover:underline">{b.name}</div>
+                        </Link>
                         <div className="mobile-only-show" style={{ fontSize: 10, opacity: 0.6 }}>{b.folio_prefix}-{b.folio_no}</div>
                       </td>
                       <td className="mobile-hidden td-mono" data-label="Vehicle" style={{ fontSize: 11 }}>{b.vehicle?.vehicle_no || '—'}</td>
@@ -648,7 +657,13 @@ export default function Borrowers() {
                 <div className="alert alert--info" style={{ marginTop: 12, fontSize: 12 }}>No active finance record found.</div>
               )}
 
-              <div style={{ marginTop: 24, display: 'flex', gap: 10 }}>
+              <div style={{ marginTop: 24, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                <Link to={`/borrowers/${selected.id}/ledger`} className="btn btn--primary btn--sm" style={{ width: '100%', justifyContent: 'center', marginBottom: 4, background: 'var(--success)', borderColor: 'var(--success)' }}>
+                  <Wallet size={15} style={{ marginRight: 6 }} /> Interactive Ledger (Payments)
+                </Link>
+                <Link to={`/borrowers/${selected.id}/balance-sheet`} className="btn btn--outline btn--sm" style={{ width: '100%', justifyContent: 'center' }}>
+                  <FileText size={15} style={{ marginRight: 6 }} /> Full Balance Sheet (Ledger)
+                </Link>
                 <Link to={`/borrowers/${selected.id}/vehicle/new`} className="btn btn--outline btn--sm" style={{ flex: 1 }}>Edit Asset</Link>
                 <button onClick={() => setModal(selected)} className="btn btn--outline btn--sm" style={{ flex: 1 }}>Edit Identity</button>
               </div>

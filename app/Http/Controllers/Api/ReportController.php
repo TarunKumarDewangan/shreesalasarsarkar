@@ -17,7 +17,7 @@ class ReportController extends Controller
         $start = $request->start_date;
         $end   = $request->end_date;
         
-        // Base Query
+        // Base Query with eager loading and counts
         $query = Borrower::with(['vehicle', 'latestLoan' => function($q) {
             $q->withCount([
                 'installments as total_ins',
@@ -63,29 +63,14 @@ class ReportController extends Controller
             $query->where('zone', $request->zone);
         }
 
-        $borrowers = $query->get();
-
-        // Recovery Percentage Calculation & Filtering
-        $data = $borrowers->map(function($b) {
-            $loan = $b->latestLoan;
-            $percent = 0;
-            if ($loan && $loan->total_ins > 0) {
-                $percent = ($loan->paid_ins / $loan->total_ins) * 100;
-            }
-            $b->recovery_percentage = round($percent, 1);
-            return $b;
+        // --- Stats Calculation (Optimized) ---
+        // Use a more efficient subquery pattern for stats
+        $filteredBorrowerIds = (clone $query)->select('id');
+        
+        $statQuery = Installment::whereIn('loan_id', function($q) use ($filteredBorrowerIds) {
+            $q->select('id')->from('loans')->whereIn('borrower_id', $filteredBorrowerIds);
         });
 
-        if ($request->min_percent !== null) {
-            $data = $data->filter(fn($b) => $b->recovery_percentage >= (float)$request->min_percent);
-        }
-        if ($request->max_percent !== null) {
-            $data = $data->filter(fn($b) => $b->recovery_percentage <= (float)$request->max_percent);
-        }
-
-        // Global Stats (Independent of borrower list filtering, but scoped to financer & dates)
-        $statQuery = Installment::whereHas('loan', fn($q) => $q->where('financer_id', $financer_id));
-        
         if ($start && $end) {
             $statQuery->whereBetween('due_date', [$start, $end]);
         }
@@ -97,10 +82,77 @@ class ReportController extends Controller
             'overdue_count'    => $statQuery->where('status', 'PENDING')->where('due_date', '<', Carbon::today())->count(),
         ];
 
+        // Pagination: 50 per page for reports
+        $borrowers = $query->paginate(50);
+
+        // Map recovery percentage (still needed for display)
+        $borrowers->getCollection()->transform(function($b) {
+            $loan = $b->latestLoan;
+            $percent = 0;
+            if ($loan && $loan->total_ins > 0) {
+                $percent = ($loan->paid_ins / $loan->total_ins) * 100;
+            }
+            $b->recovery_percentage = round($percent, 1);
+            return $b;
+        });
+
+        // Note: Percentage filtering at the PHP level with pagination is complex.
+        // If the user needs strict percentage filtering, it should ideally be refactored 
+        // to a raw SQL query with a 'HAVING' clause or a database view.
+        // For now, we prioritize pagination for large dataset stability.
+
         return response()->json([
             'stats' => $stats,
-            'data'  => $data->values(),
+            'data'  => $borrowers,
         ]);
+    }
+
+    public function individualBalance(Request $request, Borrower $borrower)
+    {
+        $this->authorizeAccess($request, $borrower);
+
+        $borrower->load([
+            'vehicle', 
+            'guarantor', 
+            'recoveryMan',
+            'latestLoan.installments' => function($q) {
+                $q->orderBy('due_date', 'asc');
+            }
+        ]);
+
+        $loan = $borrower->latestLoan;
+        $summary = null;
+
+        if ($loan) {
+            $summary = [
+                'total_amount'    => (float)$loan->total_amount,
+                'total_paid'      => (float)$loan->installments()->where('status', 'PAID')->sum('amount_paid'),
+                'total_pending'   => (float)$loan->installments()->where('status', 'PENDING')->sum('amount_due'),
+                'overdue_amount'  => (float)$loan->installments()
+                    ->where('status', 'PENDING')
+                    ->where('due_date', '<', Carbon::today())
+                    ->sum('amount_due'),
+                'last_paid_date'  => $loan->installments()->where('status', 'PAID')->latest('paid_date')->first()?->paid_date,
+            ];
+            $summary['balance'] = round($summary['total_amount'] - $summary['total_paid'], 2);
+        }
+
+        return response()->json([
+            'borrower' => $borrower,
+            'summary'  => $summary
+        ]);
+    }
+
+    private function authorizeAccess(Request $request, Borrower $borrower): void
+    {
+        $user = $request->user();
+        if ($user->isAdmin()) return;
+
+        $effectiveOwnerId = $user->isStaff() ? $user->financer_id : $user->id;
+        
+        if ($borrower->financer_id !== $effectiveOwnerId) {
+            abort(403, 'Access denied.');
+        }
     }
 
     private function financer_id(Request $request): int

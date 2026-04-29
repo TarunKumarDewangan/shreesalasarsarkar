@@ -40,17 +40,15 @@ class Installment extends Model
         $paidDueDate = \Carbon\Carbon::parse($this->due_date)->format('d-m-Y');
 
         $msg = "नमस्ते *" . $borrower->name . "*,\n\n" .
-               "आपके *₹" . number_format($this->amount_paid) . "* का भुगतान रसीद नंबर *" . $this->receipt_no . "* के साथ प्राप्त हो गया है।\n" .
+               "आपके *₹" . number_format($this->amount_paid) . "* का भुगतान रसीद नंबर *" . ($this->receipt_no ?? 'N/A') . "* के साथ प्राप्त हो गया है।\n" .
                "किस्त की देय तिथि: *" . $paidDueDate . "*\n" .
                "अगली किस्त की देय तिथि: *" . $nextDate . "*\n\n" .
                "अपने खाते की जानकारी के लिए यहाँ क्लिक करें: http://localhost:5173/borrower/login\n\n" .
                "धन्यवाद!\n" .
                "*" . ($loan->financer->finance_name ?? 'Shree Salasar Sarkar Finance') . "*";
 
-        $mobile = preg_replace('/[^0-9]/', '', $borrower->mobile);
-        if (strlen($mobile) === 10) $mobile = '91' . $mobile;
-
-        return app(\App\Services\WhatsAppService::class)->sendMessage($mobile, $msg, $loan->financer_id);
+        \App\Jobs\SendWhatsAppNotification::dispatch($borrower->mobile, $msg, $loan->financer_id);
+        return ['success' => true, 'message' => 'Job dispatched'];
     }
 
     public function sendReminderWhatsApp($daysLeft)
@@ -68,9 +66,7 @@ class Installment extends Model
                "धन्यवाद!\n" .
                "*" . ($loan->financer->finance_name ?? 'Shree Salasar Sarkar Finance') . "*";
 
-        $mobile = preg_replace('/[^0-9]/', '', $borrower->mobile);
-        if (strlen($mobile) === 10) $mobile = '91' . $mobile;
-
-        return app(\App\Services\WhatsAppService::class)->sendMessage($mobile, $msg, $loan->financer_id);
+        \App\Jobs\SendWhatsAppNotification::dispatch($borrower->mobile, $msg, $loan->financer_id);
+        return ['success' => true, 'message' => 'Job dispatched'];
     }
 }

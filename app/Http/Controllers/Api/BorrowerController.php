@@ -31,6 +31,58 @@ class BorrowerController extends Controller
         return response()->json($zones);
     }
 
+    public function onboardingMetadata(Request $request)
+    {
+        $financerId = $this->financer_id($request);
+        $user = $request->user();
+
+        // 1. Next Folio
+        $max = Borrower::withTrashed()
+            ->where('financer_id', $financerId)
+            ->max('folio_no');
+        $next = $max ? (int)$max + 1 : 7426100;
+
+        // 2. Metadata (Zones, Models, Colors, etc.)
+        $zones = Borrower::where('financer_id', $financerId)
+            ->whereNotNull('zone')->where('zone', '!=', '')
+            ->distinct()->orderBy('zone')->pluck('zone');
+
+        $getDistinct = function($col) use ($financerId) {
+            return Vehicle::whereHas('borrower', fn($q) => $q->where('financer_id', $financerId))
+                ->whereNotNull($col)
+                ->where($col, '!=', '')
+                ->selectRaw("UPPER(TRIM($col)) as val")
+                ->distinct()
+                ->orderBy('val')
+                ->pluck('val');
+        };
+        
+        $conditions = $getDistinct('condition_type');
+        $soldBy     = $getDistinct('sold_by');
+        $models     = $getDistinct('model');
+        $colors     = $getDistinct('color');
+
+        // 3. Financers list (only for admin, others get restricted list)
+        $financers = [];
+        if ($user->isAdmin()) {
+            $financers = \App\Models\User::where('role', 'financer')->orderBy('name')->get(['id', 'name', 'finance_name']);
+        } elseif ($user->isFinancer()) {
+            $financers = [$user->only(['id', 'name', 'finance_name'])];
+        } elseif ($user->isStaff() && $user->financer) {
+            $financers = [$user->financer->only(['id', 'name', 'finance_name'])];
+        }
+
+        return response()->json([
+            'next_folio' => (string)$next,
+            'zones'      => $zones,
+            'conditions' => $conditions,
+            'sold_by'    => $soldBy,
+            'models'     => $models,
+            'colors'     => $colors,
+            'financers'  => $financers
+        ]);
+    }
+
     public function vehicleConditions(Request $request)
     {
         $financerId = $this->financer_id($request);
@@ -98,17 +150,7 @@ class BorrowerController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Borrower::with(['recoveryMan', 'guarantor', 'vehicle', 'latestLoan' => function($q) {
-            $q->withCount([
-                'installments as total_installments',
-                'installments as paid_installments' => function($iq) {
-                    $iq->where('status', 'PAID');
-                },
-                'installments as pending_installments' => function($iq) {
-                    $iq->where('status', 'PENDING');
-                }
-            ]);
-        }])
+        $query = Borrower::with(['recoveryMan', 'guarantor', 'vehicle', 'latestLoan'])
             ->has('loans')
             ->where('financer_id', $this->financer_id($request));
 
@@ -243,7 +285,7 @@ class BorrowerController extends Controller
 
     public function show(Request $request, Borrower $borrower)
     {
-        $this->authorizeAccess($request, $borrower);
+        $this->authorize('view', $borrower);
         return response()->json($borrower->load(['recoveryMan', 'guarantor', 'vehicle', 'latestLoan' => function($q) {
             $q->withCount([
                 'installments as total_installments',
@@ -259,7 +301,7 @@ class BorrowerController extends Controller
 
     public function update(Request $request, Borrower $borrower)
     {
-        $this->authorizeAccess($request, $borrower);
+        $this->authorize('update', $borrower);
 
         $data = $request->validate([
             'recovery_man_id' => 'nullable|exists:users,id',
@@ -312,7 +354,7 @@ class BorrowerController extends Controller
 
     public function destroy(Request $request, Borrower $borrower)
     {
-        $this->authorizeAccess($request, $borrower);
+        $this->authorize('delete', $borrower);
         $borrower->delete();
         return response()->json(['message' => 'Borrower deleted.']);
     }
@@ -348,15 +390,5 @@ class BorrowerController extends Controller
         return null;
     }
 
-    private function authorizeAccess(Request $request, Borrower $borrower): void
-    {
-        $user = $request->user();
-        if ($user->isAdmin()) return;
 
-        $effectiveOwnerId = $user->isStaff() ? $user->financer_id : $user->id;
-        
-        if ($borrower->financer_id !== $effectiveOwnerId) {
-            abort(403, 'Access denied.');
-        }
-    }
 }

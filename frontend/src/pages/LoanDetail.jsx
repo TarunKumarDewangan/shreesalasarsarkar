@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../api'
 import { 
   ChevronLeft, Save, Printer, Trash2, 
-  AlertTriangle, CheckSquare, Loader2 
+  AlertTriangle, CheckSquare, Loader2, RotateCcw
 } from 'lucide-react'
 import { fmtDate, fmtCurrency } from '../utils'
 
@@ -35,13 +35,12 @@ export default function LoanDetail() {
   useEffect(() => {
     Promise.all([
       api.get(`/loans/${id}`),
-      api.get('/borrowers/zones').catch(() => ({ data: [] })),
-      api.get('/borrowers/vehicle-conditions').catch(() => ({ data: [] }))
+      api.get('/borrowers/onboarding-metadata').catch(() => ({ data: {} })),
     ])
-      .then(([r, zRes, cRes]) => {
+      .then(([r, metaRes]) => {
         const l = r.data
-        setZones(zRes.data || [])
-        setConditions(cRes.data || [])
+        setZones(metaRes.data?.zones || [])
+        setConditions(metaRes.data?.conditions || [])
         setData({
           borrower_id: l.borrower_id,
           // Borrower
@@ -86,7 +85,9 @@ export default function LoanDetail() {
       })
       .catch(e => {
         console.error(e)
-        setError('Failed to load loan details.')
+        const msg = e.response?.data?.message || e.message || 'Failed to load loan details.'
+        const status = e.response?.status ? ` (Status: ${e.response.status})` : ''
+        setError(msg + status)
       })
       .finally(() => setLoading(false))
   }, [id])
@@ -415,6 +416,7 @@ export default function LoanDetail() {
                   <th style={{ textAlign: 'left', padding: '10px 16px' }}>Due Date</th>
                   <th style={{ textAlign: 'right', padding: '10px 16px' }}>Amount Due</th>
                   <th style={{ textAlign: 'right', padding: '10px 16px' }}>Amount Paid</th>
+                  <th style={{ textAlign: 'right', padding: '10px 16px' }}>Balance</th>
                   <th style={{ textAlign: 'center', padding: '10px 16px' }}>Status</th>
                 </tr>
               </thead>
@@ -425,6 +427,7 @@ export default function LoanDetail() {
                     <td style={{ padding: '8px 16px' }}>{fmtDate(ins.due_date)}</td>
                     <td style={{ textAlign: 'right', padding: '8px 16px', fontWeight: 600 }}>₹{fmtCurrency(ins.amount_due)}</td>
                     <td style={{ textAlign: 'right', padding: '8px 16px', color: 'var(--success)', fontWeight: 600 }}>₹{fmtCurrency(ins.amount_paid)}</td>
+                    <td style={{ textAlign: 'right', padding: '8px 16px', color: '#64748b' }}>₹{fmtCurrency(Number(ins.balance) + (ins.status === 'PAID' ? 0 : Number(ins.amount_due)))}</td>
                     <td style={{ textAlign: 'center', padding: '8px 16px' }}>
                       <span className={`badge badge--xs badge--${ins.status === 'PAID' ? 'success' : ins.status === 'SETTLED' ? 'primary' : 'warning'}`}>
                         {ins.status}
@@ -554,12 +557,24 @@ export default function LoanDetail() {
                 <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  <button className="btn btn--warning btn--sm" style={{ flex: 1 }} onClick={() => handleStatusChange('SEIZED')} disabled={data.status === 'SEIZED'}>
-                    <AlertTriangle size={14} /> Seized
-                  </button>
-                  <button className="btn btn--success btn--sm" style={{ flex: 1 }} onClick={() => setShowSettlement(true)} disabled={data.status === 'FINAL' || data.status === 'CLOSED'}>
-                    <CheckSquare size={14} /> Final
-                  </button>
+                  {data.status === 'SEIZED' ? (
+                    <button className="btn btn--primary btn--sm" style={{ flex: 1 }} onClick={() => handleStatusChange('ACTIVE')}>
+                      <RotateCcw size={14} /> Revert to Normal
+                    </button>
+                  ) : (data.status === 'FINAL' || data.status === 'CLOSED') ? (
+                    <button className="btn btn--primary btn--sm" style={{ flex: 1 }} onClick={() => handleStatusChange('ACTIVE')}>
+                      <RotateCcw size={14} /> Revert to Active
+                    </button>
+                  ) : (
+                    <>
+                      <button className="btn btn--warning btn--sm" style={{ flex: 1 }} onClick={() => handleStatusChange('SEIZED')}>
+                        <AlertTriangle size={14} /> Seized
+                      </button>
+                      <button className="btn btn--success btn--sm" style={{ flex: 1 }} onClick={() => setShowSettlement(true)}>
+                        <CheckSquare size={14} /> Final
+                      </button>
+                    </>
+                  )}
                 </div>
                 
                 <button className="btn btn--primary" style={{ width: '100%' }} onClick={handleUpdate} disabled={saving}>
