@@ -981,3 +981,94 @@ html {
     margin: 0;
   }
 }
+
+/* Global Search Styling */
+.global-search {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0 15px;
+  height: 44px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  transition: all 0.2s;
+}
+
+.search-input-wrapper:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+}
+
+.search-input-wrapper input {
+  flex: 1;
+  border: none !important;
+  background: none;
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+  outline: none;
+  text-transform: none !important;
+}
+
+.search-icon { color: #94a3b8; }
+.clear-btn { border: none; background: none; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 5px; border-radius: 50%; }
+.clear-btn:hover { background: #f1f5f9; color: #64748b; }
+
+.search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+  padding: 8px;
+}
+
+.search-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.search-item:hover { background: #f8fafc; }
+
+.item-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.item-icon.user { background: #eff6ff; color: #2563eb; }
+.item-icon.history { background: #f0fdf4; color: #16a34a; }
+
+.item-content { flex: 1; min-width: 0; }
+.item-title { font-weight: 700; font-size: 14px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-sub { font-size: 11px; color: #64748b; }
+.item-type { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 4px 8px; background: #f1f5f9; color: #475569; border-radius: 6px; flex-shrink: 0; }
+
+.no-results { padding: 20px; text-align: center; color: #64748b; font-size: 13px; }
+
+.spinner { animation: spin 1s linear infinite; color: var(--primary); }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+

@@ -46,11 +46,12 @@ class Loan extends Model
         $interest = ($gross * $rate * $months) / 1200;
         $mathTotal = $gross + $interest;
         
-        // Use ceil to round up if ANY decimal exists (even .0001)
-        $emi = $months > 0 ? ceil($mathTotal / $months) : 0;
+        // Use round instead of ceil for a more natural EMI estimation
+        $emi = $months > 0 ? round($mathTotal / $months) : 0;
         
-        // The total contract sum must match the sum of rounded installments
-        $contractTotal = $emi * $months;
+        // The total contract sum should be the mathematical total.
+        // Rounding discrepancies will be handled by adjusting the last installment.
+        $contractTotal = $mathTotal;
 
         return array_merge($data, [
             'gross_amount'     => round($gross, 2),

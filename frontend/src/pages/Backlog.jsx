@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import api from '../api'
 import { 
   FileUp, Search, Clock, Trash2, ChevronDown, ChevronRight, 
-  CheckCircle, AlertCircle, Filter, Download, ExternalLink
+  CheckCircle, AlertCircle, Filter, Download, ExternalLink, X
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { fmtCurrency, fmtDate } from '../utils'
@@ -27,7 +27,12 @@ export default function Backlog() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(load, [page, type])
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      load()
+    }, 400) // 400ms debounce
+    return () => clearTimeout(timer)
+  }, [page, type, search])
 
   const handleUpload = async (e, mode, uploadType) => {
     const file = e.target.files[0]
@@ -127,16 +132,29 @@ export default function Backlog() {
             placeholder="Search by name or FNO..." 
             style={{ paddingLeft: 40 }}
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
             onKeyDown={e => e.key === 'Enter' && load()}
           />
+          {search && (
+            <button 
+              onClick={() => { setSearch(''); setPage(1); }}
+              style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
-        <select className="form-control" style={{ width: 150 }} value={type} onChange={e => setType(e.target.value)}>
+        <select className="form-control" style={{ width: 150 }} value={type} onChange={e => {
+          setType(e.target.value)
+          setPage(1)
+        }}>
           <option value="">All Types</option>
           <option value="P">Pendings</option>
           <option value="F">Finals</option>
         </select>
-        <button className="btn btn--primary" onClick={load}>Search</button>
       </div>
 
       {/* Data Table */}

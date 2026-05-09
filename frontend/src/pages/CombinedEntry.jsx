@@ -16,9 +16,9 @@ function calcLoan(financeAmt, agreementAmt, hpRto, months, rate) {
   const interest = (gross * toN(rate) * toN(months)) / 1200
   const mathTotal = gross + interest
   const actualEmi = toN(months) > 0 ? mathTotal / toN(months) : 0
-  const emi      = Math.ceil(actualEmi)
-  // Total sum should be exactly the sum of installments
-  const total    = emi * toN(months)
+  const emi      = Math.round(actualEmi)
+  // Total sum should be the mathematical total, not the rounded emi * months
+  const total    = mathTotal
   return { gross, interest, total, emi, actualEmi, mathTotal }
 }
 

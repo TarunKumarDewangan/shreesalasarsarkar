@@ -24,7 +24,7 @@ class BorrowerAuthController extends Controller
             return response()->json(['message' => 'Mobile number not registered.'], 404);
         }
 
-        $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $borrower->update([
             'otp' => $otp,
             'otp_expires_at' => Carbon::now()->addMinutes(10)

@@ -13,6 +13,7 @@ export function AuthProvider({ children }) {
     const { data } = await api.post('/login', { email, password })
     localStorage.setItem('token', data.token)
     localStorage.setItem('user', JSON.stringify(data.user))
+    localStorage.setItem('role', data.user.role)
     setToken(data.token)
     setUser(data.user)
     return data.user
@@ -22,6 +23,7 @@ export function AuthProvider({ children }) {
     try { await api.post('/logout') } catch {}
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    localStorage.removeItem('role')
     setToken(null)
     setUser(null)
   }

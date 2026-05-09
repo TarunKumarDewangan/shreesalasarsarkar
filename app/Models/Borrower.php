@@ -6,9 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Sanctum\HasApiTokens;
 
+use App\Traits\HasRoles;
+
 class Borrower extends Model
 {
-    use SoftDeletes, HasApiTokens;
+    use SoftDeletes, HasApiTokens, HasRoles;
+
+    public function isBorrower(): bool
+    {
+        return true;
+    }
     protected $fillable = [
         'financer_id', 'customer_id', 'recovery_man_id', 'folio_prefix', 'folio_no', 'zone', 'collection_day',
         'name', 'father_name', 'mobile', 'mobile2', 'aadhar', 'pan', 'dob', 'address',

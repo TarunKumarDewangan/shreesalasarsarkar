@@ -47,6 +47,15 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
+        
+        if ($user instanceof \App\Models\Borrower) {
+            return response()->json($user->load(['latestLoan.financer', 'latestLoan.installments' => function($q) {
+                $q->withCount(['recoveries as pending_recovery_count' => function($sq) {
+                    $sq->where('status', 'PENDING');
+                }]);
+            }]));
+        }
+
         return response()->json([
             'id'           => $user->id,
             'name'         => $user->name,

@@ -3,9 +3,10 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, CreditCard, BarChart2,
   LogOut, Building2, Menu, X, CheckCircle, ShieldAlert,
-  MessageSquare, Trash2, Clock
+  MessageSquare, Trash2, Clock, Activity
 } from 'lucide-react'
 import { useState } from 'react'
+import GlobalSearch from '../components/GlobalSearch'
 
 const adminNav = [
   { to: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard' },
@@ -14,6 +15,7 @@ const adminNav = [
   { to: '/customers',       icon: Users,            label: 'Personal Details' },
   { to: '/backlog',         icon: Clock,            label: 'Backlog' },
   { to: '/trash',           icon: Trash2,           label: 'Trash Bin' },
+  { to: '/admin/audit-logs', icon: Activity,         label: 'Audit Logs' },
 ]
 
 const financerNav = [
@@ -98,6 +100,18 @@ export default function AppLayout() {
           </button>
           <span style={{ fontSize: 16, letterSpacing: -0.5 }}>Shree Salasar Sarkar</span>
         </header>
+
+        <div className="top-bar" style={{ 
+          padding: '12px 32px', 
+          background: 'white', 
+          borderBottom: '1px solid #e2e8f0',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100
+        }}>
+          <GlobalSearch />
+        </div>
+
         <div className="page-wrapper">
           <Outlet />
         </div>

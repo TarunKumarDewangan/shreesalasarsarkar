@@ -4,11 +4,10 @@ namespace App\Imports;
 
 use App\Models\BacklogAccount;
 use App\Models\BacklogInstallment;
-use Maatwebsite\Excel\Concerns\ToModel;
-use Maatwebsite\Excel\Concerns\WithStartRow;
-use Carbon\Carbon;
+use Maatwebsite\Excel\Concerns\WithBatchInserts;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 
-class BacklogInstallmentsImport implements ToModel, WithStartRow
+class BacklogInstallmentsImport implements ToModel, WithStartRow, WithBatchInserts, WithChunkReading
 {
     protected $type;
 
@@ -22,16 +21,24 @@ class BacklogInstallmentsImport implements ToModel, WithStartRow
         return 2; // Skip header
     }
 
+    protected static $accountCache = [];
+
     public function model(array $row)
     {
         $fno = $row[2] ?? null;
         if (!$fno) return null;
 
-        $account = BacklogAccount::where('fno', $fno)
-                                  ->where('type', $this->type)
-                                  ->first();
-
-        if (!$account) return null;
+        $cacheKey = $this->type . '_' . $fno;
+        
+        if (!isset(self::$accountCache[$cacheKey])) {
+            $account = BacklogAccount::where('fno', $fno)
+                                      ->where('type', $this->type)
+                                      ->first();
+            if (!$account) return null;
+            self::$accountCache[$cacheKey] = $account;
+        }
+        
+        $account = self::$accountCache[$cacheKey];
 
         $paid = $this->num($row[9] ?? 0);
         $balanceAfter = $this->num($row[12] ?? 0);
@@ -44,21 +51,36 @@ class BacklogInstallmentsImport implements ToModel, WithStartRow
         $instAmt = $account->installment_amount ?: ($account->total_amount / ($account->total_months ?: 1));
         $principalFixed = round($instAmt - $interestFixed);
 
+        $im = $this->num($row[10] ?? 1);
+
         return new BacklogInstallment([
             'backlog_account_id' => $account->id,
             'fno'                => $fno,
-            'rno'                => $this->num($row[3] ?? null),
+            'rno'                => $row[3] ?? null,
             'installment_no'     => $this->num($row[4] ?? null),
             'installment_amount' => $this->num($row[5] ?? null),
             'due_date'           => $this->parseDate($row[6] ?? null),
             'paid_amount'        => $paid,
+            'im'                 => $im,
             'payment_date'       => $this->parseDate($row[11] ?? null),
             'balance_amount'     => $balanceAfter,
             'delay_days'         => $this->num($row[13] ?? null),
-            'mode'               => $row[14] ?? null,
+            'mode'               => $row[7] ?? null, // cbcode is the Mode at index 7
             'principal_amount'   => $principalFixed,
             'interest_amount'    => $interestFixed,
+            'coverage'           => ($im > 1) ? "$im Months" : "1 Month",
+            'status'             => ($paid > 0) ? 'PAID' : 'PENDING',
         ]);
+    }
+
+    public function batchSize(): int
+    {
+        return 1000;
+    }
+
+    public function chunkSize(): int
+    {
+        return 1000;
     }
 
     private function num($val)

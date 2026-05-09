@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\BacklogAccount;
 use App\Models\BacklogInstallment;
+use App\Models\AuditLog;
 use App\Imports\BacklogAccountsImport;
 use App\Imports\BacklogInstallmentsImport;
 use Maatwebsite\Excel\Facades\Excel;
@@ -87,6 +88,7 @@ class BacklogController extends Controller
             'exc_amount' => 'nullable|numeric',
             'coverage' => 'nullable|string',
             'rate_per_day' => 'nullable|integer',
+            'im' => 'nullable|integer',
         ]);
 
         $account = BacklogAccount::findOrFail($id);
@@ -113,10 +115,13 @@ class BacklogController extends Controller
             'balance_amount' => max(0, $newBalance),
             'mode' => $request->mode ?: 'CASH',
             'status' => 'PAID',
-            'coverage' => $request->coverage ?: '1 Month',
+            'coverage' => $request->im ? ($request->im . ($request->im > 1 ? ' Months' : ' Month')) : ($request->coverage ?: '1 Month'),
             'rate_per_day' => $request->rate_per_day ?: 10,
+            'im' => $request->im ?: 1,
             'cheque_no' => $request->cheque_no
         ]);
+
+        AuditLog::log($request, 'BACKLOG_PAYMENT_ADDED', $installment, $request->all());
 
         return response()->json([
             'message' => 'Payment recorded successfully',
@@ -139,6 +144,7 @@ class BacklogController extends Controller
             'coverage' => 'nullable|string',
             'status' => 'nullable|string',
             'rate_per_day' => 'nullable|integer',
+            'im' => 'nullable|integer',
             'strategy' => 'nullable|string', // 'BAL' or 'AUTO_SPLIT'
         ]);
 
@@ -158,9 +164,10 @@ class BacklogController extends Controller
             'interest_amount' => $request->interest_amount,
             'fine_amount' => $request->fine_amount,
             'exc_amount' => $request->exc_amount,
-            'coverage' => ($strategy === 'AUTO_SPLIT') ? floor($paidAmt / $emi) . ' Months' : ($request->coverage ?: '1 Month'),
+            'coverage' => ($strategy === 'AUTO_SPLIT') ? floor($paidAmt / $emi) . ' Months' : ($request->im ? ($request->im . ($request->im > 1 ? ' Months' : ' Month')) : ($request->coverage ?: '1 Month')),
             'status' => $request->status ?: 'PAID',
             'rate_per_day' => $request->rate_per_day,
+            'im' => $request->im,
             'cheque_no' => $request->cheque_no
         ]);
 
@@ -196,13 +203,16 @@ class BacklogController extends Controller
         // Recalculate balance for this and subsequent installments
         $this->recalculateBalances($installment->backlog_account_id);
 
+        AuditLog::log($request, 'BACKLOG_INSTALLMENT_EDITED', $installment, $request->all());
+
         return response()->json(['message' => 'Installment updated successfully']);
     }
 
-    public function deleteInstallment($id)
+    public function deleteInstallment(Request $request, $id)
     {
         $installment = BacklogInstallment::findOrFail($id);
         $accountId = $installment->backlog_account_id;
+        \App\Models\AuditLog::log($request, 'BACKLOG_INSTALLMENT_DELETED', $installment, $installment->toArray());
         $installment->delete();
 
         // Recalculate balances and installment numbers
@@ -217,13 +227,24 @@ class BacklogController extends Controller
         $installments = $account->installments()->orderBy('due_date', 'asc')->orderBy('id', 'asc')->get();
         
         $currentPaid = 0;
-        foreach ($installments as $idx => $ins) {
+        $currentMonthCount = 0;
+        foreach ($installments as $ins) {
             $currentPaid += $ins->paid_amount;
+            $months = $ins->im ?: 1;
             $ins->update([
-                'installment_no' => $idx + 1,
+                'installment_no' => $currentMonthCount + 1,
                 'balance_amount' => max(0, $account->total_amount - $currentPaid)
             ]);
+            $currentMonthCount += $months;
         }
+    }
+
+    public function seize(Request $request, $id)
+    {
+        $account = BacklogAccount::findOrFail($id);
+        $account->type = 'S'; // 'S' for Seized
+        $account->save();
+        return response()->json(['message' => 'Vehicle seized successfully']);
     }
 
     public function settle(Request $request, $id)
@@ -272,17 +293,20 @@ class BacklogController extends Controller
 
         $installments = $account->installments()->orderBy('due_date', 'asc')->orderBy('id', 'asc')->get();
         $currentPaid = 0;
+        $currentMonthCount = 0;
         
-        foreach ($installments as $idx => $ins) {
+        foreach ($installments as $ins) {
             $paid = $ins->paid_amount;
             $currentPaid += $paid;
+            $months = $ins->im ?: 1;
             
             $ins->update([
-                'installment_no' => $idx + 1,
-                'principal_amount' => $principalFixed,
-                'interest_amount' => $interestFixed,
+                'installment_no' => $currentMonthCount + 1,
+                'principal_amount' => $principalFixed * $months,
+                'interest_amount' => $interestFixed * $months,
                 'balance_amount' => max(0, $account->total_amount - $currentPaid)
             ]);
+            $currentMonthCount += $months;
         }
         
         return response()->json(['message' => 'All installments recalculated successfully']);

@@ -271,6 +271,8 @@ class BorrowerController extends Controller
                 $borrower->save();
             }
 
+            \App\Models\AuditLog::log($request, 'BORROWER_CREATED', $borrower, $data);
+
             return response()->json(
                 $borrower->load(['guarantor', 'vehicle', 'recoveryMan']),
                 201
@@ -349,12 +351,15 @@ class BorrowerController extends Controller
             $borrower->save();
         }
 
+        \App\Models\AuditLog::log($request, 'BORROWER_UPDATED', $borrower, $data);
+
         return response()->json($borrower->fresh(['guarantor', 'vehicle']));
     }
 
     public function destroy(Request $request, Borrower $borrower)
     {
         $this->authorize('delete', $borrower);
+        \App\Models\AuditLog::log($request, 'BORROWER_DELETED', $borrower, $borrower->toArray());
         $borrower->delete();
         return response()->json(['message' => 'Borrower deleted.']);
     }

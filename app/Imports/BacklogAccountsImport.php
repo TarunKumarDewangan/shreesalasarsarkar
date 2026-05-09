@@ -3,11 +3,10 @@
 namespace App\Imports;
 
 use App\Models\BacklogAccount;
-use Maatwebsite\Excel\Concerns\ToModel;
-use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\WithStartRow;
+use Maatwebsite\Excel\Concerns\WithBatchInserts;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 
-class BacklogAccountsImport implements ToModel, WithStartRow
+class BacklogAccountsImport implements ToModel, WithStartRow, WithBatchInserts, WithChunkReading
 {
     protected $type;
 
@@ -30,7 +29,7 @@ class BacklogAccountsImport implements ToModel, WithStartRow
 
         $famt = $this->num($row[40] ?? 0);
         $tmonths = $this->num($row[38] ?? 0);
-        $interval = $this->num($row[39] ?? 1);
+        $interval = $this->num($row[39] ?? 1) ?: 1; // Default to 1 if zero or null
         $inst_amt = $this->num($row[45] ?? 0); // irate / Installment Amount
         
         $agreement_amt = $this->num($row[42] ?? 0);
@@ -40,13 +39,13 @@ class BacklogAccountsImport implements ToModel, WithStartRow
         $interest_rate = 0;
         $interest_amt = $this->num($row[41] ?? 0);
 
-        if ($inst_amt > 0 && $tmonths > 0) {
+        if ($inst_amt > 0 && $tmonths > 0 && $interval > 0) {
             $total_inst = $tmonths / $interval;
             $calc_total = $inst_amt * $total_inst;
             // Derived Interest Amount = Calculated Total - Finance - Agreement - HP
             $interest_amt = $calc_total - $famt - $agreement_amt - $hp_amt;
             
-            if ($famt > 0) {
+            if ($famt > 0 && $tmonths > 0) {
                 $interest_rate = ($interest_amt / $famt) * (12 / $tmonths) * 100;
             }
         } elseif ($famt > 0 && $tmonths > 0) {
@@ -83,6 +82,16 @@ class BacklogAccountsImport implements ToModel, WithStartRow
             'type'            => $this->type,
             'is_active'       => true,
         ]);
+    }
+
+    public function batchSize(): int
+    {
+        return 1000;
+    }
+
+    public function chunkSize(): int
+    {
+        return 1000;
     }
 
     private function num($val)

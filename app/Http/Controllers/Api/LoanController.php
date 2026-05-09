@@ -100,6 +100,8 @@ class LoanController extends Controller
         $loan = Loan::create($data);
         $loan->generateInstallments();
 
+        \App\Models\AuditLog::log($request, 'LOAN_CREATED', $loan, $data);
+
         if ($request->boolean('send_whatsapp')) {
             $loan->load('borrower'); // Ensure borrower is loaded
             if ($loan->borrower && $loan->borrower->mobile) {
@@ -220,6 +222,8 @@ class LoanController extends Controller
             $loan->generateInstallments();
         }
 
+        \App\Models\AuditLog::log($request, 'LOAN_UPDATED', $loan, $data);
+
         return response()->json($loan->fresh(['borrower', 'installments']));
     }
 
@@ -228,7 +232,7 @@ class LoanController extends Controller
         $this->authorize('update', $loan);
 
         $request->validate([
-            'collection_amount' => 'required|numeric|min:0',
+            'collection_amount' => 'nullable|numeric|min:0',
             'notes'             => 'nullable|string',
         ]);
 
@@ -237,8 +241,6 @@ class LoanController extends Controller
             'status'     => 'SETTLED',
             'notes'      => $request->notes ?? 'Final Settlement',
             'paid_date'  => now(),
-            // We don't necessarily update amount_paid for each, 
-            // but the user wants to close the loan.
         ]);
 
         $loan->update(['status' => 'FINAL']);
@@ -249,15 +251,24 @@ class LoanController extends Controller
         ]);
     }
 
+    public function seize(Request $request, Loan $loan)
+    {
+        $this->authorize('update', $loan);
+        $loan->update(['status' => 'SEIZED']);
+        return response()->json(['message' => 'Vehicle marked as SEIZED successfully.']);
+    }
+
     public function destroy(Request $request, Loan $loan)
     {
         $this->authorize('delete', $loan);
         
         $borrower = $loan->borrower;
+        \App\Models\AuditLog::log($request, 'LOAN_DELETED', $loan, $loan->toArray());
         $loan->delete();
 
         // If borrower has no other active loans, cleanup the borrower case entry too
         if ($borrower && $borrower->loans()->count() === 0) {
+            \App\Models\AuditLog::log($request, 'BORROWER_DELETED_AUTO', $borrower, ['reason' => 'No active loans left']);
             $borrower->delete();
         }
 

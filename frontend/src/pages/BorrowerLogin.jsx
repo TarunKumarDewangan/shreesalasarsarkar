@@ -102,7 +102,7 @@ export default function BorrowerLogin() {
                 type="text" 
                 className="form-control" 
                 style={{ paddingLeft: 48, borderRadius: 12, height: 50, fontSize: 16 }} 
-                placeholder={useOtp ? '4-digit OTP' : 'Enter Folio No.'}
+                placeholder={useOtp ? '6-digit OTP' : 'Enter Folio No.'}
                 value={otpValue}
                 onChange={e => setOtpValue(e.target.value)}
                 required

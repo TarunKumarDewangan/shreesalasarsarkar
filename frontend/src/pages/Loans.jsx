@@ -206,7 +206,11 @@ export default function Loans() {
                     <td className="td-mono" data-label="Folio" style={{ fontSize: 11, fontWeight: 700 }}>
                       {l.borrower?.folio_prefix}-{l.borrower?.folio_no}
                     </td>
-                    <td data-label="Borrower"><strong>{l.borrower?.name||'—'}</strong></td>
+                    <td data-label="Borrower">
+                      <Link to={`/borrowers/${l.borrower?.id}/ledger`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                        <strong>{l.borrower?.name||'—'}</strong>
+                      </Link>
+                    </td>
                     <td className="td-mono" data-label="Vehicle">{l.borrower?.vehicle?.vehicle_no||'—'}</td>
                     <td data-label="Amount">₹{fmt(l.gross_amount)}</td>
                     <td data-label="Rate">{l.interest_rate}%</td>

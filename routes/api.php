@@ -13,11 +13,11 @@ use App\Http\Controllers\Api\WhatsAppController;
 use Illuminate\Support\Facades\Route;
 
 // ──────────────── PUBLIC ────────────────
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:6,1');
 
 // Borrower Portal Auth
-Route::post('/borrower/send-otp', [\App\Http\Controllers\Api\BorrowerAuthController::class, 'sendOTP']);
-Route::post('/borrower/login',    [\App\Http\Controllers\Api\BorrowerAuthController::class, 'login']);
+Route::post('/borrower/send-otp', [\App\Http\Controllers\Api\BorrowerAuthController::class, 'sendOTP'])->middleware('throttle:6,1');
+Route::post('/borrower/login',    [\App\Http\Controllers\Api\BorrowerAuthController::class, 'login'])->middleware('throttle:6,1');
 
 // ──────────────── PROTECTED ─────────────
 Route::middleware('auth:sanctum')->group(function () {
@@ -29,6 +29,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ── ADMIN ONLY ──
     Route::middleware('role:admin')->group(function () {
         Route::apiResource('financers', FinancerController::class)->except(['index']);
+        Route::get('audit-logs', [\App\Http\Controllers\Api\AuditLogController::class, 'index']);
     });
     Route::get('financers', [FinancerController::class, 'index']);
 
@@ -50,11 +51,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/loans/{loan}/approve', [LoanController::class, 'approve']);
     Route::patch('/loans/{loan}/reject', [LoanController::class, 'reject']);
     Route::post('/loans/{loan}/settle', [LoanController::class, 'settle']);
+    Route::post('/loans/{loan}/seize', [LoanController::class, 'seize']);
     Route::apiResource('loans', LoanController::class);
 
     // Installments
     Route::get('/loans/{loan}/installments',        [InstallmentController::class, 'index']);
+    Route::post('/loans/{loan}/add-payment',        [InstallmentController::class, 'addExtraPayment']);
     Route::patch('/installments/{installment}/pay', [InstallmentController::class, 'markPaid']);
+    Route::patch('/installments/{installment}/edit-payment', [InstallmentController::class, 'editPayment']);
     Route::patch('/installments/{installment}/unpay',[InstallmentController::class, 'markPending']);
 
     // Dashboard stats
@@ -93,5 +97,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/backlog-installments/{id}', [\App\Http\Controllers\Api\BacklogController::class, 'updateInstallment']);
     Route::delete('/backlog-installments/{id}', [\App\Http\Controllers\Api\BacklogController::class, 'deleteInstallment']);
     Route::post('/backlog/{id}/settle', [\App\Http\Controllers\Api\BacklogController::class, 'settle']);
+    Route::post('/backlog/{id}/seize', [\App\Http\Controllers\Api\BacklogController::class, 'seize']);
     Route::post('/backlog/{id}/recalculate', [\App\Http\Controllers\Api\BacklogController::class, 'recalculateAll']);
+    Route::get('/universal-search', [\App\Http\Controllers\Api\GlobalSearchController::class, 'search']);
 });

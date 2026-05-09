@@ -29,6 +29,7 @@ const InteractiveLedger      = lazy(() => import('./pages/InteractiveLedger'))
 const BorrowerProfile       = lazy(() => import('./pages/BorrowerProfile'))
 const Backlog               = lazy(() => import('./pages/Backlog'))
 const BacklogProfile        = lazy(() => import('./pages/BacklogProfile'))
+const AuditLogs             = lazy(() => import('./pages/AuditLogs'))
 
 function Loading() {
   return (
@@ -38,12 +39,14 @@ function Loading() {
   )
 }
 
+const ADMIN_ROLES = ['admin', 'financer', 'staff']
+
 function AppRoutes() {
   return (
     <Suspense fallback={<Loading />}>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route element={<ProtectedRoute />}>
+        <Route element={<ProtectedRoute allowedRoles={ADMIN_ROLES} />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard"   element={<Dashboard />} />
             <Route path="/entry"       element={<CombinedEntry />} />
@@ -67,12 +70,15 @@ function AppRoutes() {
             <Route path="/borrowers/:id/balance-sheet" element={<IndividualBalanceSheet />} />
             <Route path="/borrowers/:id/ledger" element={<InteractiveLedger />} />
             <Route path="/admin/financers" element={<Financers />} />
+            <Route path="/admin/audit-logs" element={<AuditLogs />} />
           </Route>
         </Route>
         
         {/* Borrower Portal */}
         <Route path="/borrower/login" element={<BorrowerLogin />} />
-        <Route path="/borrower/dashboard" element={<BorrowerDashboard />} />
+        <Route element={<ProtectedRoute allowedRoles={['BORROWER']} />}>
+          <Route path="/borrower/dashboard" element={<BorrowerDashboard />} />
+        </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

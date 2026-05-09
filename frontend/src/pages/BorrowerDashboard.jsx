@@ -8,14 +8,25 @@ export default function BorrowerDashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'))
-    if (user && user.latest_loan) {
-      setData(user)
-      setLoading(false)
-    } else {
-      // Fetch latest data if needed
-      window.location.href = '/borrower/login'
-    }
+    setLoading(true)
+    api.get('/me')
+      .then(res => {
+        if (res.data.id) {
+          // Update localStorage with fresh data
+          localStorage.setItem('user', JSON.stringify(res.data))
+          setData(res.data)
+        }
+      })
+      .catch(err => {
+        console.error("Refresh failed:", err)
+        const user = JSON.parse(localStorage.getItem('user'))
+        if (user && user.latest_loan) {
+          setData(user)
+        } else {
+          window.location.href = '/borrower/login'
+        }
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   if (loading || !data) return <div className="loading-text">Loading profile...</div>

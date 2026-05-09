@@ -479,7 +479,7 @@ export default function Borrowers() {
                         <span className="td-mono">{b.folio_prefix}-{b.folio_no}</span>
                       </td>
                       <td data-label="Name">
-                        <Link to={`/borrowers/${b.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                        <Link to={`/borrowers/${b.id}/ledger`} style={{ textDecoration: 'none', color: 'inherit' }}>
                           <div style={{ fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }} className="hover:underline">{b.name}</div>
                         </Link>
                         <div className="mobile-only-show" style={{ fontSize: 10, opacity: 0.6 }}>{b.folio_prefix}-{b.folio_no}</div>
