@@ -203,7 +203,8 @@ class BorrowerController extends Controller
             $query->whereBetween('created_at', [$request->start_date . ' 00:00:00', $request->end_date . ' 23:59:59']);
         }
 
-        return response()->json($query->orderBy('id', 'desc')->paginate(20));
+        $perPage = min((int) $request->get('per_page', 15), 100);
+        return response()->json($query->orderBy('id', 'desc')->paginate($perPage));
     }
 
     public function store(Request $request)

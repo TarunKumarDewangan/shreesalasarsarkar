@@ -54,7 +54,8 @@ class LoanController extends Controller
             });
         }
 
-        return response()->json($query->orderBy('id', 'desc')->paginate(20));
+        $perPage = min((int) $request->get('per_page', 15), 100);
+        return response()->json($query->orderBy('id', 'desc')->paginate($perPage));
     }
 
     /**

@@ -12,4 +12,9 @@ class BacklogAccount extends Model
     {
         return $this->hasMany(BacklogInstallment::class, 'backlog_account_id');
     }
+
+    public function recoveryMan()
+    {
+        return $this->belongsTo(User::class, 'recovery_man_id');
+    }
 }

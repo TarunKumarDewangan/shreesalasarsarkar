@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import api from '../../api'
 
-export default function AssignmentModal({ borrower, staff, onClose, onSaved }) {
+export default function AssignmentModal({ borrower, staff, onClose, onSaved, apiEndpoint }) {
   const [form, setForm] = useState(() => {
     const today = new Date().toISOString().split('T')[0]
     return {
@@ -15,7 +15,7 @@ export default function AssignmentModal({ borrower, staff, onClose, onSaved }) {
   const save = async (e) => {
     e.preventDefault(); setSaving(true)
     try {
-      await api.put(`/borrowers/${borrower.id}`, form)
+      await api.put(apiEndpoint || `/borrowers/${borrower.id}`, form)
       onSaved()
     } catch (ex) {
       alert('Failed to save assignment.')

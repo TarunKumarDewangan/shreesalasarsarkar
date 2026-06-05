@@ -88,16 +88,23 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/trash/{type}/{id}/force', [\App\Http\Controllers\Api\TrashController::class, 'forceDelete']);
 
     // Backlog Management
+    Route::get('/backlog-due', [\App\Http\Controllers\Api\BacklogController::class, 'dueInstallments']);
     Route::get('/backlog', [\App\Http\Controllers\Api\BacklogController::class, 'index']);
     Route::get('/backlog/{id}', [\App\Http\Controllers\Api\BacklogController::class, 'show']);
     Route::post('/backlog/upload-accounts', [\App\Http\Controllers\Api\BacklogController::class, 'uploadAccounts']);
     Route::post('/backlog/upload-installments', [\App\Http\Controllers\Api\BacklogController::class, 'uploadInstallments']);
     Route::delete('/backlog/clear', [\App\Http\Controllers\Api\BacklogController::class, 'destroy']);
     Route::post('/backlog/{id}/payment', [\App\Http\Controllers\Api\BacklogController::class, 'addPayment']);
+    Route::put('/backlog/{id}/assign-recovery-man', [\App\Http\Controllers\Api\BacklogController::class, 'assignRecoveryMan']);
     Route::patch('/backlog-installments/{id}', [\App\Http\Controllers\Api\BacklogController::class, 'updateInstallment']);
     Route::delete('/backlog-installments/{id}', [\App\Http\Controllers\Api\BacklogController::class, 'deleteInstallment']);
     Route::post('/backlog/{id}/settle', [\App\Http\Controllers\Api\BacklogController::class, 'settle']);
     Route::post('/backlog/{id}/seize', [\App\Http\Controllers\Api\BacklogController::class, 'seize']);
     Route::post('/backlog/{id}/recalculate', [\App\Http\Controllers\Api\BacklogController::class, 'recalculateAll']);
     Route::get('/universal-search', [\App\Http\Controllers\Api\GlobalSearchController::class, 'search']);
+    Route::get('/cashbook', [\App\Http\Controllers\Api\CashbookController::class, 'index']);
+    Route::get('/combine-due', [\App\Http\Controllers\Api\CombineController::class, 'dueInstallments']);
+    Route::get('/combine-backlog', [\App\Http\Controllers\Api\CombineController::class, 'backlogAccounts']);
+    Route::get('/combine-metadata', [\App\Http\Controllers\Api\CombineController::class, 'metadata']);
 });
+

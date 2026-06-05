@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import api from '../api'
 import { Search, PlusCircle, Edit2, Trash2, X, Car, Wallet, FileText, UserPlus, Calendar, CheckSquare, Printer } from 'lucide-react'
+import InteractiveLedger from './InteractiveLedger'
 import LiveSearchInput from '../components/LiveSearchInput'
 import PayModal from '../components/PayModal'
 import ReceiptModal from '../components/ReceiptModal'
@@ -221,6 +222,7 @@ function BorrowerModal({ borrower, onClose, onSaved, staff = [], zones = [] }) {
 
 export default function Borrowers() {
   const { user, isStaff, isFinancer, isAdmin } = useAuth()
+  const nav = useNavigate()
   const [list, setList]       = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch]   = useState('')
@@ -233,6 +235,28 @@ export default function Borrowers() {
   const [receiptModal, setReceiptModal] = useState(null)
   const [insLoading, setInsLoading] = useState(false)
   const [installments, setInstallments] = useState([])
+  const [selectedLedgerId, setSelectedLedgerId] = useState(null)
+
+  const refreshSelected = (borrowerId) => {
+    if (!borrowerId) return
+    api.get(`/borrowers/${borrowerId}`).then(r => {
+      setSelected(r.data)
+      if (r.data.latest_loan?.id) {
+        setInsLoading(true)
+        api.get(`/loans/${r.data.latest_loan.id}/installments`)
+          .then(res => setInstallments(res.data))
+          .finally(() => setInsLoading(false))
+      }
+    })
+  }
+
+  const handleCloseLedger = () => {
+    setSelectedLedgerId(null)
+    load(page, search)
+    if (selected?.id) {
+      refreshSelected(selected.id)
+    }
+  }
   const [staff, setStaff] = useState([])
   const [zones, setZones] = useState([])
   const [filters, setFilters] = useState({ 
@@ -251,7 +275,7 @@ export default function Borrowers() {
 
   const load = (p = 1, q = '', f = filters) => {
     setLoading(true)
-    const params = { page: p, search: q, ...f }
+    const params = { page: p, search: q, per_page: 15, ...f }
     api.get('/borrowers', { params })
       .then(r => {
         setList(r.data.data ?? r.data)
@@ -379,6 +403,97 @@ export default function Borrowers() {
         <p>Manage your borrower records</p>
       </div>
 
+      {/* ── Quick-View Panel (above table) ─────────────────────────── */}
+      {selected && (
+        <div className="card animate-in" style={{ marginBottom: 20, border: '2px solid var(--primary)', boxShadow: '0 4px 20px rgba(99,102,241,0.12)', borderRadius: 14 }}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(90deg,var(--primary-bg),#fff)', borderRadius: '12px 12px 0 0', padding: '12px 20px' }}>
+            <span style={{ fontWeight: 800, color: 'var(--primary)', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', display: 'inline-block' }} />
+              {selected.name} — {selected.folio_prefix}-{selected.folio_no}
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setModal(selected)} className="btn btn--outline btn--sm" style={{ fontSize: 11 }}>Edit Identity</button>
+              <Link to={`/borrowers/${selected.id}/vehicle/new`} className="btn btn--outline btn--sm" style={{ fontSize: 11 }}>Edit Asset</Link>
+              <button onClick={() => setSelectedLedgerId(selected.id)} className="btn btn--primary btn--sm" style={{ fontSize: 11, background: 'var(--success)', borderColor: 'var(--success)' }}>Ledger</button>
+              <button className="btn btn--ghost btn--sm" onClick={() => setSelected(null)}><X size={16}/></button>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, borderTop: '1px solid var(--border)' }}>
+
+            {/* Borrower Name */}
+            <div style={{ padding: '16px 20px', borderRight: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, opacity: 0.8 }}>IDENTITY</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Name:</span><strong>{selected.name}</strong></div>
+                <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>S/O:</span>{selected.father_name || '—'}</div>
+                <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Mobile:</span>{selected.mobile || '—'}</div>
+                <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Aadhar:</span>{selected.aadhar || '—'}</div>
+                <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Zone:</span>{selected.zone || '—'}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{selected.address || ''}</div>
+              </div>
+            </div>
+
+            {/* Guarantor */}
+            <div style={{ padding: '16px 20px', borderRight: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, opacity: 0.8 }}>GUARANTOR</div>
+              {selected.guarantor ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Name:</span><strong>{selected.guarantor.name}</strong></div>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>S/O:</span>{selected.guarantor.father_name || '—'}</div>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Mobile:</span>{selected.guarantor.mobile || '—'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{selected.guarantor.address || ''}</div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>No guarantor recorded</div>
+              )}
+            </div>
+
+            {/* Vehicle */}
+            <div style={{ padding: '16px 20px', borderRight: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, opacity: 0.8 }}>VEHICLE / ASSET</div>
+              {selected.vehicle ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Vehicle No:</span><strong>{selected.vehicle.vehicle_no}</strong></div>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Model:</span>{selected.vehicle.model_name || '—'}</div>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Chassis:</span>{selected.vehicle.chassis_no || '—'}</div>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Engine:</span>{selected.vehicle.engine_no || '—'}</div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>No vehicle on record</div>
+              )}
+            </div>
+
+            {/* Finance */}
+            <div style={{ padding: '16px 20px' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, opacity: 0.8 }}>FINANCE</div>
+              {selected.latest_loan ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Gross:</span><strong>₹{fmtCurrency(selected.latest_loan.gross_amount)}</strong></div>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Installment:</span>₹{fmtCurrency(selected.latest_loan.installment_amount)}</div>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Paid:</span>{selected.latest_loan.paid_installments} / {selected.latest_loan.total_installments}</div>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)', fontSize: 11, marginRight: 4 }}>Pending:</span><span style={{ color: 'var(--danger)', fontWeight: 700 }}>{selected.latest_loan.pending_installments}</span></div>
+                  <div style={{ marginTop: 4 }}>
+                    {selected.latest_loan.status === 'VERIFYING' ? (
+                      <span className="badge badge--warning" style={{ fontSize: 10 }}>Verification Pending</span>
+                    ) : selected.latest_loan.status === 'REJECTED' ? (
+                      <span className="badge badge--danger" style={{ fontSize: 10 }}>Rejected</span>
+                    ) : (
+                      <span className="badge badge--success" style={{ fontSize: 10 }}>{selected.latest_loan.status}</span>
+                    )}
+                  </div>
+                  <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+                    <button onClick={() => setSelectedLedgerId(selected.id)} className="btn btn--primary btn--sm" style={{ fontSize: 10, padding: '4px 8px', background: 'var(--success)', borderColor: 'var(--success)' }}>Ledger</button>
+                    <Link to={`/borrowers/${selected.id}/balance-sheet`} className="btn btn--outline btn--sm" style={{ fontSize: 10, padding: '4px 8px' }}>Balance Sheet</Link>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>No active loan</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="borrowers-layout">
         <div className="borrowers-main">
           <div className="card" style={{ marginBottom: 20 }}>
@@ -479,9 +594,17 @@ export default function Borrowers() {
                         <span className="td-mono">{b.folio_prefix}-{b.folio_no}</span>
                       </td>
                       <td data-label="Name">
-                        <Link to={`/borrowers/${b.id}/ledger`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                          <div style={{ fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }} className="hover:underline">{b.name}</div>
-                        </Link>
+                        <span 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSelectedLedgerId(b.id);
+                          }} 
+                          style={{ fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }} 
+                          className="hover:underline"
+                        >
+                          {b.name}
+                        </span>
                         <div className="mobile-only-show" style={{ fontSize: 10, opacity: 0.6 }}>{b.folio_prefix}-{b.folio_no}</div>
                       </td>
                       <td className="mobile-hidden td-mono" data-label="Vehicle" style={{ fontSize: 11 }}>{b.vehicle?.vehicle_no || '—'}</td>
@@ -528,6 +651,22 @@ export default function Borrowers() {
                   ))}
                 </tbody>
               </table>
+              {/* Pagination */}
+              {meta && meta.last_page > 1 && (
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems: 'center', gap:8, padding:'12px 16px', borderTop:'1px solid var(--border)' }}>
+                  <span style={{ fontSize:12, color:'var(--text-muted)' }}>Showing {list.length} of {meta.total || ''} borrowers</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn--outline btn--sm" disabled={page<=1} onClick={() => load(page-1, search)}>← Prev</button>
+                    <span style={{ alignSelf:'center', fontSize:13, color:'var(--text-muted)' }}>Page {page} / {meta.last_page}</span>
+                    <button className="btn btn--outline btn--sm" disabled={page>=meta.last_page} onClick={() => load(page+1, search)}>Next →</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      </div>
 
       {recoveredModal && (
         <RecoveredModal
@@ -537,140 +676,6 @@ export default function Borrowers() {
         />
       )}
 
-              {/* Pagination */}
-              {meta && meta.last_page > 1 && (
-                <div style={{ display:'flex', justifyContent:'flex-end', gap:8, padding:'12px 16px', borderTop:'1px solid var(--border)' }}>
-                  <button className="btn btn--outline btn--sm" disabled={page<=1} onClick={() => load(page-1, search)}>← Prev</button>
-                  <span style={{ alignSelf:'center', fontSize:13, color:'var(--text-muted)' }}>Page {page} / {meta.last_page}</span>
-                  <button className="btn btn--outline btn--sm" disabled={page>=meta.last_page} onClick={() => load(page+1, search)}>Next →</button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {selected && (
-        <div className="card side-panel animate-in" style={{ flex: '1 1 35%', position: 'sticky', top: 20, minWidth: 320 }}>
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Borrower Quick-View</span>
-              <button className="btn btn--ghost btn--sm" onClick={() => setSelected(null)}><X size={16}/></button>
-            </div>
-            <div className="card-body" style={{ padding: 20 }}>
-              <div className="view-section">
-                <label>IDENTITY</label>
-                <div className="view-grid">
-                  <div className="view-item"><span>Folio:</span> <strong>{selected.folio_prefix}-{selected.folio_no}</strong></div>
-                  <div className="view-item"><span>Name:</span> <strong>{selected.name}</strong></div>
-                  <div className="view-item"><span>S/O:</span> {selected.father_name}</div>
-                  <div className="view-item"><span>Mobile:</span> {selected.mobile}</div>
-                  <div className="view-item"><span>Mobile 2:</span> {selected.mobile2 || '—'}</div>
-                  <div className="view-item"><span>DOB:</span> {fmtDate(selected.dob)}</div>
-                  <div className="view-item"><span>Aadhar:</span> {selected.aadhar || '—'}</div>
-                  <div className="view-item"><span>PAN:</span> {selected.pan || '—'}</div>
-                  <div className="view-item" style={{ gridColumn: 'span 2' }}><span>Address:</span> {selected.address}</div>
-                  <div className="view-item"><span>Recovery Agent:</span> <strong>{selected.recovery_man?.name || 'Unassigned'}</strong></div>
-                  <div className="view-item"><span>Assign Date:</span> {selected.collection_day ? fmtDate(selected.collection_day) : 'Not Set'}</div>
-                </div>
-              </div>
-
-              {selected.vehicle && (
-                <div className="view-section">
-                  <label>ASSET / VEHICLE</label>
-                  <div className="view-grid">
-                    <div className="view-item"><span>Vehicle:</span> <strong>{selected.vehicle.vehicle_no}</strong></div>
-                    <div className="view-item"><span>Model:</span> {selected.vehicle.model_name}</div>
-                    <div className="view-item"><span>Chassis:</span> {selected.vehicle.chassis_no}</div>
-                  </div>
-                </div>
-              )}
-
-              {selected.latest_loan ? (
-                <div className="view-section">
-                  <label>FINANCE & INSTALLMENTS</label>
-                  <div className="stats-mini">
-                    <div className="stat-mini">
-                      <div className="stat-mini__val">{selected.latest_loan.paid_installments} / {selected.latest_loan.total_installments}</div>
-                      <div className="stat-mini__label">Installments Paid</div>
-                    </div>
-                    <div className="stat-mini">
-                      <div className="stat-mini__val" style={{ color: 'var(--danger)' }}>{selected.latest_loan.pending_installments}</div>
-                      <div className="stat-mini__label">Pending</div>
-                    </div>
-                  </div>
-                  
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                      <span style={{ fontSize:11, fontWeight:700, opacity:0.6 }}>ALL INSTALLMENTS</span>
-                    </div>
-                    {insLoading ? <p className="loading-text" style={{ padding: 10 }}>Loading ledger...</p> : (
-                      <div className="mini-ledger" style={{ maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
-                        {installments.map(ins => (
-                          <div key={ins.id} className="mini-ledger-item" style={{ opacity: ins.status === 'PAID' ? 0.6 : 1, marginBottom: 6 }}>
-                            <div>
-                              <div style={{ fontWeight: 600 }}>₹{fmtCurrency(ins.amount_due)}</div>
-                              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                                Due: {fmtDate(ins.due_date)} 
-                                <span style={{ marginLeft: 8, opacity: 0.7 }}>
-                                  (P: {fmtCurrency(ins.principal_amount)} | I: {fmtCurrency(ins.interest_amount)})
-                                </span>
-                              </div>
-                            </div>
-                            {ins.status === 'PAID' ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span className="badge badge--success" style={{ fontSize: 9, padding: '2px 8px' }}>PAID</span>
-                                <button className="btn btn--outline btn--xs" onClick={(e) => { e.stopPropagation(); setReceiptModal(ins); }} title="Print Receipt" style={{ padding: '2px 4px' }}>
-                                  <Printer size={10} />
-                                </button>
-                              </div>
-                            ) : ins.pending_recovery_count > 0 ? (
-                              <span className="badge badge--warning" style={{ fontSize: 9, padding: '2px 8px' }}>SENT</span>
-                            ) : (
-                              <button className="btn btn--primary btn--xs" onClick={() => setPayModal(ins)} style={{fontSize: '9px', whiteSpace: 'nowrap'}}>
-                                SEND FOR SCRUITY
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                        {installments.length === 0 && (
-                          <div style={{ fontSize: 11, textAlign: 'center', padding: 10, color: 'var(--text-muted)' }}>No installments found.</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="view-grid" style={{ marginTop: 12 }}>
-                    <div className="view-item"><span>Gross:</span> ₹{fmtCurrency(selected.latest_loan.gross_amount)}</div>
-                    <div className="view-item"><span>Installment:</span> ₹{fmtCurrency(selected.latest_loan.installment_amount)}</div>
-                    <div className="view-item"><span>Status:</span> 
-                      {selected.latest_loan.status === 'VERIFYING' ? (
-                        <span className="badge badge--warning">Verification Pending</span>
-                      ) : selected.latest_loan.status === 'REJECTED' ? (
-                        <span className="badge badge--danger">Rejected</span>
-                      ) : (
-                        <span className="badge badge--success">{selected.latest_loan.status}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="alert alert--info" style={{ marginTop: 12, fontSize: 12 }}>No active finance record found.</div>
-              )}
-
-              <div style={{ marginTop: 24, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                <Link to={`/borrowers/${selected.id}/ledger`} className="btn btn--primary btn--sm" style={{ width: '100%', justifyContent: 'center', marginBottom: 4, background: 'var(--success)', borderColor: 'var(--success)' }}>
-                  <Wallet size={15} style={{ marginRight: 6 }} /> Interactive Ledger (Payments)
-                </Link>
-                <Link to={`/borrowers/${selected.id}/balance-sheet`} className="btn btn--outline btn--sm" style={{ width: '100%', justifyContent: 'center' }}>
-                  <FileText size={15} style={{ marginRight: 6 }} /> Full Balance Sheet (Ledger)
-                </Link>
-                <Link to={`/borrowers/${selected.id}/vehicle/new`} className="btn btn--outline btn--sm" style={{ flex: 1 }}>Edit Asset</Link>
-                <button onClick={() => setModal(selected)} className="btn btn--outline btn--sm" style={{ flex: 1 }}>Edit Identity</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
       {modal === 'add' && <BorrowerModal staff={staff} zones={zones} onClose={() => { setModal(null); if(loc.pathname==='/borrowers/new') nav('/borrowers') }} onSaved={() => { setModal(null); load(); if(loc.pathname==='/borrowers/new') nav('/borrowers') }} />}
       {modal?.id && <BorrowerModal borrower={modal} staff={staff} zones={zones} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(page, search) }} />}
@@ -689,6 +694,32 @@ export default function Borrowers() {
           borrower={selected}
           onClose={() => setReceiptModal(null)}
         />
+      )}
+
+      {selectedLedgerId && (
+        <div className="modal-backdrop" style={{ padding: '20px', zIndex: 10000 }} onClick={handleCloseLedger}>
+          <div className="modal animate-in" style={{ 
+            maxWidth: '96vw', 
+            width: '96vw', 
+            maxHeight: '96vh', 
+            height: '96vh', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            borderRadius: '16px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+            border: '1px solid var(--border)'
+          }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', background: 'white', borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text)', margin: 0 }}>Account Statement & Ledger</h2>
+              <button className="modal-close" onClick={handleCloseLedger} style={{ background: '#f1f5f9', border: 'none', padding: '6px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ flex: 1, padding: 0, overflowY: 'auto', background: '#f8fafc', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
+              <InteractiveLedger profileId={selectedLedgerId} onBack={handleCloseLedger} />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

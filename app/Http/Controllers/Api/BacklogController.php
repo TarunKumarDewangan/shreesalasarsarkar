@@ -312,10 +312,174 @@ class BacklogController extends Controller
         return response()->json(['message' => 'All installments recalculated successfully']);
     }
 
+    public function dueInstallments(Request $request)
+    {
+        // Fetch all backlog accounts with their installments
+        $accounts = BacklogAccount::with(['installments' => function($q) {
+            $q->orderBy('due_date', 'asc');
+        }])->get();
+
+        $data = [];
+
+        foreach ($accounts as $account) {
+            $total_paid = $account->installments->sum('paid_amount');
+            $current_balance = $account->total_amount - $total_paid;
+            
+            // Calculate due date (oldest pending, fallback to first/latest)
+            $oldestPending = $account->installments->where('status', 'PENDING')->first();
+            $due_date = $oldestPending ? $oldestPending->due_date : ($account->installments->first()?->due_date ?? null);
+            
+            // Agreement date is the due date of the first installment
+            $agreement_date = $account->installments->first()?->due_date ?? null;
+            
+            $inst_rate = (float)$account->installment_amount;
+            if ($inst_rate <= 0 && $account->total_months > 0) {
+                $inst_rate = $account->total_amount / $account->total_months;
+            }
+            
+            $due_inst = 0;
+            if ($inst_rate > 0) {
+                $due_inst = round($current_balance / $inst_rate, 1);
+            }
+
+            // Prepare record
+            $data[] = [
+                'id' => $account->id,
+                'sno' => $account->sno,
+                'fno' => $account->fno,
+                'customer_name' => $account->customer_name,
+                'father_name' => $account->father_name,
+                'mobile' => $account->mobile,
+                'vehicle_model' => $account->vehicle_model,
+                'vehicle_no' => $account->vehicle_no,
+                'chassis_no' => $account->chassis_no,
+                'engine_no' => $account->engine_no,
+                'vehicle_make' => $account->vehicle_make,
+                'zone' => $account->zone,
+                'cbcode' => $account->cbcode,
+                'total_months' => $account->total_months,
+                'installment_amount' => $account->installment_amount,
+                'finance_amount' => $account->finance_amount,
+                'total_amount' => $account->total_amount,
+                'type' => $account->type, // 'P', 'F', 'S'
+                'current_balance' => $current_balance,
+                'due_inst' => $due_inst,
+                'due_date' => $due_date,
+                'agreement_date' => $agreement_date,
+            ];
+        }
+
+        // Apply filters in PHP
+        $collection = collect($data);
+
+        // Filter: Folio range
+        if ($request->filled('folio_start')) {
+            $collection = $collection->where('fno', '>=', (int)$request->folio_start);
+        }
+        if ($request->filled('folio_end')) {
+            $collection = $collection->where('fno', '<=', (int)$request->folio_end);
+        }
+
+        // Filter: Financer (cbcode)
+        if ($request->filled('financer') && $request->financer !== 'ALL') {
+            $collection = $collection->where('cbcode', $request->financer);
+        }
+
+        // Filter: Zone
+        if ($request->filled('zone') && $request->zone !== 'ALL') {
+            $collection = $collection->where('zone', $request->zone);
+        }
+
+        // Filter: Model
+        if ($request->filled('model') && $request->model !== 'ALL') {
+            $collection = $collection->where('vehicle_model', $request->model);
+        }
+
+        // Filter: Vehicle No
+        if ($request->filled('vehicle_no') && $request->vehicle_no !== 'ALL') {
+            $collection = $collection->where('vehicle_no', $request->vehicle_no);
+        }
+
+        // Filter: Make (vehicle_make) year range
+        if ($request->filled('make_start')) {
+            $collection = $collection->where('vehicle_make', '>=', (int)$request->make_start);
+        }
+        if ($request->filled('make_end')) {
+            $collection = $collection->where('vehicle_make', '<=', (int)$request->make_end);
+        }
+
+        // Filter: Due Months >=
+        if ($request->filled('due_months_min')) {
+            $collection = $collection->where('due_inst', '>=', (float)$request->due_months_min);
+        }
+
+        // Filter: Total Months range
+        if ($request->filled('total_months_start')) {
+            $collection = $collection->where('total_months', '>=', (int)$request->total_months_start);
+        }
+        if ($request->filled('total_months_end')) {
+            $collection = $collection->where('total_months', '<=', (int)$request->total_months_end);
+        }
+
+        // Filter: Due Date range
+        if ($request->filled('due_date_start')) {
+            $collection = $collection->filter(function($item) use ($request) {
+                return $item['due_date'] >= $request->due_date_start;
+            });
+        }
+        if ($request->filled('due_date_end')) {
+            $collection = $collection->filter(function($item) use ($request) {
+                return $item['due_date'] <= $request->due_date_end;
+            });
+        }
+
+        // Filter: Agreement Date range
+        if ($request->filled('agreement_date_start')) {
+            $collection = $collection->filter(function($item) use ($request) {
+                return $item['agreement_date'] >= $request->agreement_date_start;
+            });
+        }
+        if ($request->filled('agreement_date_end')) {
+            $collection = $collection->filter(function($item) use ($request) {
+                return $item['agreement_date'] <= $request->agreement_date_end;
+            });
+        }
+
+        // Filter: Search (Chassis or Engine)
+        if ($request->filled('search_val')) {
+            $searchType = $request->search_type === 'engine' ? 'engine_no' : 'chassis_no';
+            $val = strtolower($request->search_val);
+            $collection = $collection->filter(function($item) use ($searchType, $val) {
+                return str_contains(strtolower($item[$searchType] ?? ''), $val);
+            });
+        }
+
+        return response()->json($collection->values()->all());
+    }
+
     public function destroy()
     {
         BacklogInstallment::query()->delete();
         BacklogAccount::query()->delete();
         return response()->json(['message' => 'Backlog cleared successfully']);
+    }
+
+    public function assignRecoveryMan(Request $request, $id)
+    {
+        $request->validate([
+            'recovery_man_id' => 'nullable|exists:users,id',
+            'collection_date' => 'nullable|date',
+        ]);
+
+        $account = BacklogAccount::findOrFail($id);
+        $account->update([
+            'recovery_man_id' => $request->recovery_man_id,
+            'collection_date' => $request->collection_date,
+        ]);
+
+        return response()->json([
+            'message' => 'Recovery agent assigned successfully',
+            'account' => $account
+        ]);
     }
 }

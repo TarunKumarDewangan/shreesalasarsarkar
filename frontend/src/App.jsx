@@ -28,8 +28,12 @@ const IndividualBalanceSheet = lazy(() => import('./pages/IndividualBalanceSheet
 const InteractiveLedger      = lazy(() => import('./pages/InteractiveLedger'))
 const BorrowerProfile       = lazy(() => import('./pages/BorrowerProfile'))
 const Backlog               = lazy(() => import('./pages/Backlog'))
+const BacklogDue            = lazy(() => import('./pages/BacklogDue'))
 const BacklogProfile        = lazy(() => import('./pages/BacklogProfile'))
 const AuditLogs             = lazy(() => import('./pages/AuditLogs'))
+const Cashbook              = lazy(() => import('./pages/Cashbook'))
+const CombineDueInstallment = lazy(() => import('./pages/CombineDueInstallment'))
+const CombineViewBacklog    = lazy(() => import('./pages/CombineViewBacklog'))
 
 function Loading() {
   return (
@@ -65,10 +69,17 @@ function AppRoutes() {
             <Route path="/trash"       element={<Trash />} />
             <Route path="/verifications" element={<Verifications />} />
             <Route path="/backlog"      element={<Backlog />} />
+            <Route path="/backlog-due"  element={<BacklogDue />} />
             <Route path="/backlog/:id"  element={<BacklogProfile />} />
             <Route path="/borrowers/:id" element={<BorrowerProfile />} />
             <Route path="/borrowers/:id/balance-sheet" element={<IndividualBalanceSheet />} />
             <Route path="/borrowers/:id/ledger" element={<InteractiveLedger />} />
+            <Route path="/cashbook" element={<Cashbook type="combine" />} />
+            <Route path="/accounts/new-cashbook" element={<Cashbook type="new" />} />
+            <Route path="/accounts/backlog-cashbook" element={<Cashbook type="backlog" />} />
+            <Route path="/accounts/combine-cashbook" element={<Cashbook type="combine" />} />
+            <Route path="/combine/due-installment" element={<CombineDueInstallment />} />
+            <Route path="/combine/view-backlog" element={<CombineViewBacklog />} />
             <Route path="/admin/financers" element={<Financers />} />
             <Route path="/admin/audit-logs" element={<AuditLogs />} />
           </Route>

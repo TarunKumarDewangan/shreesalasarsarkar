@@ -33,19 +33,26 @@ export default function Loans() {
   const [assignModal, setAssignModal] = useState(null)
   const [deleteModal, setDeleteModal] = useState(null)
   const [notifyModal, setNotifyModal] = useState(null)
+  const [page, setPage]         = useState(1)
+  const [meta, setMeta]         = useState(null)
 
   const loadStaff = () => api.get('/recovery-men').then(r => setStaff(r.data))
 
-  const load = () => {
+  const load = (p = 1, q = search) => {
     setLoading(true)
-    api.get('/loans', { params: { ...filters, search } })
-      .then(r => setList(r.data?.data ?? r.data))
+    api.get('/loans', { params: { ...filters, search: q, page: p, per_page: 15 } })
+      .then(r => {
+        setList(r.data?.data ?? r.data)
+        setMeta(r.data?.meta ?? null)
+        setPage(p)
+      })
       .finally(() => setLoading(false))
   }
-  useEffect(load, [filters]) // reload on filter change
+  useEffect(() => { load(1) }, [filters]) // reload on filter change
   useEffect(() => { loadStaff() }, [])
 
   const filtered = useMemo(() => {
+    if (!search) return list
     return list.filter(l =>
       (l.borrower?.name || '').toLowerCase().includes(search.toLowerCase()) ||
       (l.borrower?.vehicle?.vehicle_no || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -75,12 +82,13 @@ export default function Loans() {
             <LiveSearchInput 
               placeholder="Search by name, vehicle no or mobile..." 
               className="search-bar-primary"
-              onSearch={setSearch}
+              onSearch={(q) => { setSearch(q); load(1, q) }}
               onSelect={(res) => {
                 if (res.loan_id) {
                   setLoading(true)
                   api.get(`/loans/${res.loan_id}`).then(r => {
                     setList([r.data])
+                    setMeta(null)
                     setSelected(r.data)
                   }).finally(() => setLoading(false))
                 }
@@ -245,6 +253,17 @@ export default function Loans() {
                 ))}
               </tbody>
             </table>
+            {/* Pagination */}
+            {meta && meta.last_page > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Showing {list.length} of {meta.total || ''} loans</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn--outline btn--sm" disabled={page <= 1} onClick={() => load(page - 1)}>← Prev</button>
+                  <span style={{ alignSelf: 'center', fontSize: 13, color: 'var(--text-muted)' }}>Page {page} / {meta.last_page}</span>
+                  <button className="btn btn--outline btn--sm" disabled={page >= meta.last_page} onClick={() => load(page + 1)}>Next →</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -258,7 +277,7 @@ export default function Loans() {
           borrower={assignModal}
           staff={staff}
           onClose={() => setAssignModal(null)}
-          onSaved={() => { setAssignModal(null); load() }}
+          onSaved={() => { setAssignModal(null); load(page) }}
         />
       )}
 
@@ -266,7 +285,7 @@ export default function Loans() {
         <DeleteLoanModal
           loan={deleteModal}
           onClose={() => setDeleteModal(null)}
-          onDeleted={() => { setDeleteModal(null); load() }}
+          onDeleted={() => { setDeleteModal(null); load(page) }}
         />
       )}
 

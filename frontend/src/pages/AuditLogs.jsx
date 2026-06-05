@@ -8,9 +8,9 @@ const CSS = `
   .logs-hdr { padding: 20px 25px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
   .logs-title { font-size: 18px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 10px; }
   
-  .logs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .logs-table th { background: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 11px; }
-  .logs-table td { padding: 14px 15px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+  .logs-table { width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid #e2e8f0; }
+  .logs-table th { background: #f1f5f9; padding: 12px 15px; text-align: left; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 11px; border: 1px solid #e2e8f0; }
+  .logs-table td { padding: 14px 15px; border: 1px solid #e2e8f0; color: #334155; }
   .logs-table tr:hover { background: #f8fafc; }
 
   .action-badge { padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 800; letter-spacing: 0.3px; }

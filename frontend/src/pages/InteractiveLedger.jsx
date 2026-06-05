@@ -26,14 +26,18 @@ const CSS = `
   .bp-stat-val.green { color:#059669; }
   .bp-stat-val.red { color:#dc2626; }
 
-  .bp-body { display:grid;grid-template-columns:1fr 340px;gap:20px;padding:20px;max-width:1800px;margin:0 auto; }
+  .bp-details-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:20px; padding:20px 20px 0; max-width:1800px; margin:0 auto; }
+  @media (max-width: 1024px) { .bp-details-grid { grid-template-columns:repeat(2, 1fr); } }
+  @media (max-width: 640px) { .bp-details-grid { grid-template-columns:1fr; } }
+
+  .bp-body { display:grid;grid-template-columns:1fr;gap:20px;padding:20px;max-width:1800px;margin:0 auto; }
   .bp-card { background:white;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
   .bp-card-hdr { padding:10px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#64748b;display:flex;align-items:center;gap:8px; }
   .bp-card-body { padding:16px; }
 
-  .lt { width:100%;border-collapse:collapse;font-size:11px; min-width: 1100px; }
-  .lt th { background:#f8fafc;padding:10px 8px;text-align:left;font-weight:800;color:#64748b;border-bottom:2px solid #e2e8f0;white-space:nowrap;font-size:9px;text-transform:uppercase;letter-spacing:0.5px;overflow:hidden; }
-  .lt td { padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;color:#334155; }
+  .lt { width:100%;border-collapse:collapse;font-size:11px; min-width: 1100px; border: 1px solid #e2e8f0; }
+  .lt th { background:#f8fafc;padding:10px 8px;text-align:left;font-weight:800;color:#64748b;border:1px solid #e2e8f0;white-space:nowrap;font-size:9px;text-transform:uppercase;letter-spacing:0.5px;overflow:hidden; }
+  .lt td { padding:8px;border:1px solid #e2e8f0;vertical-align:middle;color:#334155; }
   
   .fi { width:100%;border:1px solid #e2e8f0;border-radius:4px;font-size:11px;outline:none;padding:4px 6px;box-sizing:border-box; background: white; font-weight: 600; }
   .fi:focus { border-color:#3b82f6; }
@@ -171,8 +175,9 @@ const CSS = `
   .act-btns { display:flex;gap:4px;align-items:center; }
 `;
 
-export default function InteractiveLedger() {
-  const { id } = useParams()
+export default function InteractiveLedger({ profileId, onBack }) {
+  const { id: routeId } = useParams()
+  const id = profileId || routeId
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -496,7 +501,7 @@ export default function InteractiveLedger() {
             }}><Shield size={14}/> {loan?.status === 'SEIZED' ? 'Seized' : 'Seize Vehicle'}</button>
 
             <button className="btn" onClick={handlePrint}><Printer size={16}/> Print Statement</button>
-            <button className="btn" onClick={() => navigate(-1)}><ArrowLeft size={16}/> Back</button>
+            <button className="btn" onClick={() => onBack ? onBack() : navigate(-1)}><ArrowLeft size={16}/> Back</button>
           </div>
         </div>
 
@@ -507,6 +512,52 @@ export default function InteractiveLedger() {
           <div className="bp-stat"><div className="bp-stat-label">Installments</div><div className="bp-stat-val">{loan?.installments?.length} Records</div></div>
           <div className="bp-stat"><div className="bp-stat-label">Monthly Inst.</div><div className="bp-stat-val">₹{fmtCurrency(loan?.installment_amount || loan?.emi_amount)}</div></div>
           <div className="bp-stat"><div className="bp-stat-label">Interest Rate</div><div className="bp-stat-val">{loan?.interest_rate}% p.a.</div></div>
+        </div>
+      </div>
+
+      <div className="bp-details-grid">
+        {/* Card 1: Identity & Contact */}
+        <div className="bp-card">
+          <div className="bp-card-hdr"><User size={14}/> Identity & Contact</div>
+          <div className="bp-card-body">
+            <div className="info-row"><div className="info-ic"><User size={14}/></div><div><div className="info-label">Father</div><div className="info-val">{borrower.father_name || 'N/A'}</div></div></div>
+            <div className="info-row"><div className="info-ic"><Smartphone size={14}/></div><div><div className="info-label">Mobile</div><div className="info-val">{borrower.mobile}</div></div></div>
+            <div className="info-row"><div className="info-ic"><MapPin size={14}/></div><div><div className="info-label">Address</div><div className="info-val">{borrower.address || 'N/A'}</div></div></div>
+          </div>
+        </div>
+
+        {/* Card 2: Guarantor Details */}
+        <div className="bp-card">
+          <div className="bp-card-hdr"><User size={14}/> Guarantor Details</div>
+          <div className="bp-card-body">
+            <div className="info-row"><div className="info-ic"><User size={14}/></div><div><div className="info-label">Guarantor Name</div><div className="info-val">{borrower.guarantor?.name || 'N/A'}</div></div></div>
+            <div className="info-row"><div className="info-ic"><Smartphone size={14}/></div><div><div className="info-label">Guarantor Mobile</div><div className="info-val">{borrower.guarantor?.mobile || 'N/A'}</div></div></div>
+            <div className="info-row"><div className="info-ic"><MapPin size={14}/></div><div><div className="info-label">Guarantor Address</div><div className="info-val">{borrower.guarantor?.address || 'N/A'}</div></div></div>
+          </div>
+        </div>
+
+        {/* Card 3: Asset Details */}
+        <div className="bp-card">
+          <div className="bp-card-hdr"><Car size={14}/> Asset Details</div>
+          <div className="bp-card-body">
+            <div style={{ background: '#eff6ff', padding: '8px 12px', borderRadius: 10, marginBottom: 12 }}>
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#2563eb' }}>{borrower.vehicle?.reg_no || 'N/A'}</div>
+              <div style={{ fontSize: 10, color: '#64748b' }}>{borrower.vehicle?.model || 'N/A'}</div>
+            </div>
+            <div className="summary-row"><span className="summary-lbl">Chassis</span><span className="summary-val">{borrower.vehicle?.chassis_no || 'N/A'}</span></div>
+            <div className="summary-row"><span className="summary-lbl">Engine</span><span className="summary-val">{borrower.vehicle?.engine_no || 'N/A'}</span></div>
+          </div>
+        </div>
+
+        {/* Card 4: Loan Summary */}
+        <div className="bp-card">
+          <div className="bp-card-hdr"><FileText size={14}/> Loan Summary</div>
+          <div className="bp-card-body">
+            <div className="summary-row"><span className="summary-lbl">Finance Amt</span><span className="summary-val">₹{fmtCurrency(loan?.finance_amount)}</span></div>
+            <div className="summary-row"><span className="summary-lbl">Interest Rate</span><span className="summary-val">{loan?.interest_rate}% p.a.</span></div>
+            <div className="summary-row"><span className="summary-lbl">EMI Amount</span><span className="summary-val">₹{fmtCurrency(loan?.installment_amount || loan?.emi_amount)}</span></div>
+            <div className="summary-row"><span className="summary-lbl">Total Agreement</span><span className="summary-val">₹{fmtCurrency(loan?.total_amount)}</span></div>
+          </div>
         </div>
       </div>
 
@@ -680,35 +731,6 @@ export default function InteractiveLedger() {
             </div>
           </div>
         </main>
-
-        <aside>
-          <div className="bp-card" style={{ marginBottom: 20 }}>
-            <div className="bp-card-hdr"><User size={14}/> Identity & Contact</div>
-            <div className="bp-card-body">
-              <div className="info-row"><div className="info-ic"><User size={14}/></div><div><div className="info-label">Father</div><div className="info-val">{borrower.father_name || 'N/A'}</div></div></div>
-              <div className="info-row"><div className="info-ic"><Smartphone size={14}/></div><div><div className="info-label">Mobile</div><div className="info-val">{borrower.mobile}</div></div></div>
-              <div className="info-row"><div className="info-ic"><MapPin size={14}/></div><div><div className="info-label">Address</div><div className="info-val">{borrower.address || 'N/A'}</div></div></div>
-            </div>
-          </div>
-          <div className="bp-card" style={{ marginBottom: 20 }}>
-            <div className="bp-card-hdr"><Car size={14}/> Asset Details</div>
-            <div className="bp-card-body">
-              <div style={{ background: '#eff6ff', padding: 12, borderRadius: 10, marginBottom: 12 }}>
-                <div style={{ fontSize: 18, fontWeight: 900, color: '#2563eb' }}>{borrower.vehicle?.reg_no || 'N/A'}</div>
-                <div style={{ fontSize: 10, color: '#64748b' }}>{borrower.vehicle?.model || 'N/A'}</div>
-              </div>
-              <div className="summary-row"><span className="summary-lbl">Chassis</span><span className="summary-val">{borrower.vehicle?.chassis_no || 'N/A'}</span></div>
-              <div className="summary-row"><span className="summary-lbl">Engine</span><span className="summary-val">{borrower.vehicle?.engine_no || 'N/A'}</span></div>
-            </div>
-          </div>
-          <div className="bp-card">
-            <div className="bp-card-hdr"><FileText size={14}/> Loan Summary</div>
-            <div className="bp-card-body">
-              <div className="summary-row"><span className="summary-lbl">Finance Amt</span><span className="summary-val">₹{fmtCurrency(loan?.finance_amount)}</span></div>
-              <div className="summary-row"><span className="summary-lbl">Total Agreement</span><span className="summary-val">₹{fmtCurrency(loan?.total_amount)}</span></div>
-            </div>
-          </div>
-        </aside>
       </div>
 
       {isCollectModalOpen && selectedIns && (

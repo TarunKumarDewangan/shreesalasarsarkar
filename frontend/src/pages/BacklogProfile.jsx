@@ -26,14 +26,18 @@ const CSS = `
   .bp-stat-val.green { color:#059669; }
   .bp-stat-val.red { color:#dc2626; }
 
-  .bp-body { display:grid;grid-template-columns:1fr 340px;gap:20px;padding:20px;max-width:1800px;margin:0 auto; }
+  .bp-details-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:20px; padding:20px 20px 0; max-width:1800px; margin:0 auto; }
+  @media (max-width: 1024px) { .bp-details-grid { grid-template-columns:repeat(2, 1fr); } }
+  @media (max-width: 640px) { .bp-details-grid { grid-template-columns:1fr; } }
+
+  .bp-body { display:grid;grid-template-columns:1fr;gap:20px;padding:20px;max-width:1800px;margin:0 auto; }
   .bp-card { background:white;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
   .bp-card-hdr { padding:10px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#64748b;display:flex;align-items:center;gap:8px; }
   .bp-card-body { padding:16px; }
 
-  .lt { width:100%;border-collapse:collapse;font-size:11px; min-width: 1100px; }
-  .lt th { background:#f8fafc;padding:10px 8px;text-align:left;font-weight:800;color:#64748b;border-bottom:2px solid #e2e8f0;white-space:nowrap;font-size:9px;text-transform:uppercase;letter-spacing:0.5px; overflow:hidden; }
-  .lt td { padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;color:#334155; }
+  .lt { width:100%;border-collapse:collapse;font-size:11px; min-width: 1100px; border: 1px solid #e2e8f0; }
+  .lt th { background:#f8fafc;padding:10px 8px;text-align:left;font-weight:800;color:#64748b;border:1px solid #e2e8f0;white-space:nowrap;font-size:9px;text-transform:uppercase;letter-spacing:0.5px; overflow:hidden; }
+  .lt td { padding:8px;border:1px solid #e2e8f0;vertical-align:middle;color:#334155; }
   
   .fi { width:100%;border:1px solid #e2e8f0;border-radius:4px;font-size:11px;outline:none;padding:4px 6px;box-sizing:border-box; background: white; font-weight: 600; }
   .fi:focus { border-color:#3b82f6; }
@@ -175,8 +179,9 @@ const CSS = `
   .act-btns { display:flex;gap:4px;align-items:center; }
 `;
 
-export default function BacklogProfile() {
-  const { id } = useParams()
+export default function BacklogProfile({ profileId, onBack }) {
+  const { id: routeId } = useParams()
+  const id = profileId || routeId
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -272,7 +277,7 @@ export default function BacklogProfile() {
       covered.set(ins.installment_no, { ...ins, is_placeholder: false })
       const extra = (ins.im || 1) - 1
       for (let i = 1; i <= extra; i++) {
-        covered.set(ins.installment_no + i, { is_placeholder: true, parent: ins })
+        covered.set(ins.installment_no + i, { id: `placeholder-${ins.installment_no + i}`, is_placeholder: true, parent: ins })
       }
       if (ins.status === 'PAID') {
         tPaid += Number(ins.paid_amount || 0);
@@ -513,7 +518,7 @@ export default function BacklogProfile() {
               }
             }}><Shield size={14}/> {borrower.type === 'S' ? 'Seized' : 'Seize Vehicle'}</button>
             <button className="btn" onClick={handlePrint}><Printer size={16}/> Print Statement</button>
-            <button className="btn" onClick={() => navigate(-1)}><ArrowLeft size={16}/> Back</button>
+            <button className="btn" onClick={() => onBack ? onBack() : navigate(-1)}><ArrowLeft size={16}/> Back</button>
           </div>
         </div>
 
@@ -541,6 +546,67 @@ export default function BacklogProfile() {
           <div className="bp-stat">
             <div className="bp-stat-label">Interest Rate</div>
             <div className="bp-stat-val">{borrower.interest_rate}% p.a.</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bp-details-grid">
+        {/* Card 1: Identity & Contact */}
+        <div className="bp-card">
+          <div className="bp-card-hdr"><User size={14}/> Identity & Contact</div>
+          <div className="bp-card-body">
+            <div className="info-row">
+              <div className="info-ic"><User size={14}/></div>
+              <div><div className="info-label">Father / Husband</div><div className="info-val">{borrower.father_name || 'N/A'}</div></div>
+            </div>
+            <div className="info-row">
+              <div className="info-ic"><Smartphone size={14}/></div>
+              <div><div className="info-label">Mobile</div><div className="info-val">{borrower.mobile || 'N/A'}</div></div>
+            </div>
+            <div className="info-row">
+              <div className="info-ic"><MapPin size={14}/></div>
+              <div><div className="info-label">Address</div><div className="info-val">{borrower.address || 'N/A'}</div></div>
+            </div>
+            <div className="info-row">
+              <div className="info-ic"><Info size={14}/></div>
+              <div><div className="info-label">CB Code</div><div className="info-val">CASH</div></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: Guarantor Details */}
+        <div className="bp-card">
+          <div className="bp-card-hdr"><User size={14}/> Guarantor Details</div>
+          <div className="bp-card-body">
+            <div className="info-row">
+              <div className="info-ic"><User size={14}/></div>
+              <div><div className="info-label">Guarantor Name</div><div className="info-val">{borrower.guarantor_name || 'N/A'}</div></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Asset Details */}
+        <div className="bp-card">
+          <div className="bp-card-hdr"><Car size={14}/> Asset Details</div>
+          <div className="bp-card-body">
+            <div style={{ background:'#eff6ff', padding:12, borderRadius:10, border:'1px solid #dbeafe', marginBottom:12 }}>
+              <div style={{ fontSize:18, fontWeight:900, color:'#2563eb', letterSpacing:1 }}>{borrower.vehicle_no || 'N/A'}</div>
+              <div style={{ fontSize:10, fontWeight:700, color:'#64748b', marginTop:4 }}>{borrower.vehicle_model || 'N/A'} • {borrower.vehicle_color || 'N/A'}</div>
+            </div>
+            <div className="summary-row"><span className="summary-lbl">Chassis</span><span className="summary-val">{borrower.chassis_no || 'N/A'}</span></div>
+            <div className="summary-row"><span className="summary-lbl">Engine</span><span className="summary-val">{borrower.engine_no || 'N/A'}</span></div>
+            <div className="summary-row"><span className="summary-lbl">Make Year</span><span className="summary-val">{borrower.make_year || 'N/A'}</span></div>
+          </div>
+        </div>
+
+        {/* Card 4: Loan Summary */}
+        <div className="bp-card">
+          <div className="bp-card-hdr"><FileText size={14}/> Loan Summary</div>
+          <div className="bp-card-body">
+            <div className="summary-row"><span className="summary-lbl">Finance Amt</span><span className="summary-val">₹{fmtCurrency(borrower.finance_amount)}</span></div>
+            <div className="summary-row"><span className="summary-lbl">Agreement Amt</span><span className="summary-val">₹{fmtCurrency(borrower.total_amount)}</span></div>
+            <div className="summary-row"><span className="summary-lbl">HP Amount</span><span className="summary-val">₹{fmtCurrency(borrower.hp_amount || 0)}</span></div>
+            <div className="summary-row"><span className="summary-lbl">Interest Amt</span><span className="summary-val">₹{fmtCurrency(borrower.interest_amount)}</span></div>
           </div>
         </div>
       </div>
@@ -723,81 +789,7 @@ export default function BacklogProfile() {
               </table>
             </div>
           </div>
-          
-          <div className="bp-stats" style={{ marginTop: 20, border: '1px solid #e2e8f0' }}>
-            <div className="bp-stat">
-              <div className="bp-stat-label">Total Loan</div>
-              <div className="bp-stat-val">₹{fmtCurrency(borrower.total_amount)}</div>
-            </div>
-            <div className="bp-stat">
-              <div className="bp-stat-label">Total Paid</div>
-              <div className="bp-stat-val green">₹{fmtCurrency(data.summary.total_paid)}</div>
-            </div>
-            <div className="bp-stat">
-              <div className="bp-stat-label">Balance Owed</div>
-              <div className="bp-stat-val red">₹{fmtCurrency(data.summary.balance)}</div>
-            </div>
-            <div className="bp-stat">
-              <div className="bp-stat-label">Installments</div>
-              <div className="bp-stat-val green">{(data?.account?.installments || []).length} Records</div>
-            </div>
-            <div className="bp-stat">
-              <div className="bp-stat-label">Monthly Inst.</div>
-              <div className="bp-stat-val">₹{fmtCurrency(borrower.installment_amount)}</div>
-            </div>
-            <div className="bp-stat">
-              <div className="bp-stat-label">Interest Rate</div>
-              <div className="bp-stat-val">{borrower.interest_rate}% p.a.</div>
-            </div>
-          </div>
         </main>
-
-        <aside style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div className="bp-card">
-            <div className="bp-card-hdr"><User size={14}/> Identity & Contact</div>
-            <div className="bp-card-body">
-              <div className="info-row">
-                <div className="info-ic"><User size={14}/></div>
-                <div><div className="info-label">Father / Husband</div><div className="info-val">{borrower.father_name || 'N/A'}</div></div>
-              </div>
-              <div className="info-row">
-                <div className="info-ic"><Smartphone size={14}/></div>
-                <div><div className="info-label">Mobile</div><div className="info-val">{borrower.mobile}</div></div>
-              </div>
-              <div className="info-row">
-                <div className="info-ic"><MapPin size={14}/></div>
-                <div><div className="info-label">Address</div><div className="info-val">{borrower.address || 'N/A'}</div></div>
-              </div>
-              <div className="info-row">
-                <div className="info-ic"><Info size={14}/></div>
-                <div><div className="info-label">CB Code</div><div className="info-val">CASH</div></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bp-card">
-            <div className="bp-card-hdr"><Car size={14}/> Asset Details</div>
-            <div className="bp-card-body">
-              <div style={{ background:'#eff6ff', padding:12, borderRadius:10, border:'1px solid #dbeafe', marginBottom:12 }}>
-                <div style={{ fontSize:18, fontWeight:900, color:'#2563eb', letterSpacing:1 }}>{borrower.vehicle_no || 'N/A'}</div>
-                <div style={{ fontSize:10, fontWeight:700, color:'#64748b', marginTop:4 }}>{borrower.vehicle_model || 'N/A'} • {borrower.vehicle_color || 'N/A'}</div>
-              </div>
-              <div className="summary-row"><span className="summary-lbl">Chassis</span><span className="summary-val">{borrower.chassis_no || 'N/A'}</span></div>
-              <div className="summary-row"><span className="summary-lbl">Engine</span><span className="summary-val">{borrower.engine_no || 'N/A'}</span></div>
-              <div className="summary-row"><span className="summary-lbl">Make Year</span><span className="summary-val">{borrower.make_year || 'N/A'}</span></div>
-            </div>
-          </div>
-
-          <div className="bp-card">
-            <div className="bp-card-hdr"><FileText size={14}/> Loan Summary</div>
-            <div className="bp-card-body">
-              <div className="summary-row"><span className="summary-lbl">Finance Amt</span><span className="summary-val">₹{fmtCurrency(borrower.finance_amount)}</span></div>
-              <div className="summary-row"><span className="summary-lbl">Agreement Amt</span><span className="summary-val">₹{fmtCurrency(borrower.total_amount)}</span></div>
-              <div className="summary-row"><span className="summary-lbl">HP Amount</span><span className="summary-val">₹{fmtCurrency(borrower.hp_amount || 0)}</span></div>
-              <div className="summary-row"><span className="summary-lbl">Interest Amt</span><span className="summary-val">₹{fmtCurrency(borrower.interest_amount)}</span></div>
-            </div>
-          </div>
-        </aside>
       </div>
 
       {/* Edit Installment Modal */}
