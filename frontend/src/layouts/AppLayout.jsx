@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, FileText, CreditCard, BarChart2,
   LogOut, Building2, Menu, X, CheckCircle, ShieldAlert,
   MessageSquare, Trash2, Clock, Activity, ChevronDown,
-  PlusCircle, GitMerge
+  PlusCircle, GitMerge, Database
 } from 'lucide-react'
 import { useState } from 'react'
 import GlobalSearch from '../components/GlobalSearch'
@@ -41,6 +41,7 @@ const adminNav = [
   },
   { to: '/trash',           icon: Trash2,           label: 'Trash Bin' },
   { to: '/admin/audit-logs', icon: Activity,         label: 'Audit Logs' },
+  { to: '/admin/backup',     icon: Database,         label: 'Backup & Restore' },
 ]
 
 const financerNav = [

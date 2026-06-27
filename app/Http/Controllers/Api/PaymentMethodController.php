@@ -9,26 +9,38 @@ use Illuminate\Validation\Rule;
 
 class PaymentMethodController extends Controller
 {
-    public function index(Request $request)
+    private function resolveFinancerId(Request $request): int
     {
         $user = $request->user();
-        $methods = PaymentMethod::where('financer_id', $user->id)->get();
+        if ($user->isAdmin()) {
+            return $request->financer_id ?? $user->id;
+        }
+        if ($user->isStaff()) {
+            return $user->financer_id;
+        }
+        return $user->id;
+    }
+
+    public function index(Request $request)
+    {
+        $financerId = $this->resolveFinancerId($request);
+        $methods = PaymentMethod::where('financer_id', $financerId)->get();
         return response()->json($methods);
     }
 
     public function store(Request $request)
     {
-        $user = $request->user();
+        $financerId = $this->resolveFinancerId($request);
         $data = $request->validate([
             'name' => [
                 'required', 'string', 'max:50',
-                Rule::unique('payment_methods')->where('financer_id', $user->id)
+                Rule::unique('payment_methods')->where('financer_id', $financerId)
             ],
             'is_active' => 'boolean'
         ]);
 
         $method = PaymentMethod::create([
-            'financer_id' => $user->id,
+            'financer_id' => $financerId,
             'name' => $data['name'],
             'is_active' => $data['is_active'] ?? true
         ]);
@@ -39,14 +51,16 @@ class PaymentMethodController extends Controller
     public function update(Request $request, PaymentMethod $paymentMethod)
     {
         $user = $request->user();
-        if ($paymentMethod->financer_id !== $user->id) {
+        $effectiveOwnerId = $user->isStaff() ? $user->financer_id : $user->id;
+        
+        if (!$user->isAdmin() && $paymentMethod->financer_id !== $effectiveOwnerId) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $data = $request->validate([
             'name' => [
                 'required', 'string', 'max:50',
-                Rule::unique('payment_methods')->where('financer_id', $user->id)->ignore($paymentMethod->id)
+                Rule::unique('payment_methods')->where('financer_id', $paymentMethod->financer_id)->ignore($paymentMethod->id)
             ],
             'is_active' => 'boolean'
         ]);
@@ -58,7 +72,9 @@ class PaymentMethodController extends Controller
     public function destroy(Request $request, PaymentMethod $paymentMethod)
     {
         $user = $request->user();
-        if ($paymentMethod->financer_id !== $user->id) {
+        $effectiveOwnerId = $user->isStaff() ? $user->financer_id : $user->id;
+        
+        if (!$user->isAdmin() && $paymentMethod->financer_id !== $effectiveOwnerId) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

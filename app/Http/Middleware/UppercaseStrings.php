@@ -21,6 +21,9 @@ class UppercaseStrings extends TransformsRequest
         'user_name',
         'access_token',
         'instance_id',
+        // Base64 image payloads must never be uppercased — doing so corrupts the binary data
+        'photo_base64',
+        'aadhar_photo_base64',
     ];
 
     /**

@@ -7,6 +7,10 @@ import BacklogProfile from './BacklogProfile'
 export default function BacklogDue() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [lastPage, setLastPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [pendingPage, setPendingPage] = useState(false)
   const [metadata, setMetadata] = useState({
     financers: [],
     zones: [],
@@ -49,15 +53,18 @@ export default function BacklogDue() {
     setMetadata({ financers, zones, models })
   }
 
-  const load = (isInitial = false) => {
+  const load = (isInitial = false, pageOverride = null) => {
+    const currentPage = pageOverride ?? page
     setLoading(true)
-    // For initial load, we don't pass filters so we get everything and build metadata
-    const params = isInitial ? {} : filters
+    const params = { ...(isInitial ? {} : filters), page: currentPage }
     api.get('/backlog-due', { params })
       .then(r => {
-        setData(r.data)
+        const items = r.data.data ?? r.data
+        setData(items)
+        setLastPage(r.data.last_page ?? 1)
+        setTotal(r.data.total ?? items.length)
         if (isInitial) {
-          loadMetadata(r.data)
+          loadMetadata(items)
         }
       })
       .catch(e => {
@@ -69,6 +76,14 @@ export default function BacklogDue() {
   useEffect(() => {
     load(true)
   }, [])
+
+  // Re-fetch when page changes (after user interaction)
+  useEffect(() => {
+    if (pendingPage) {
+      load(false)
+      setPendingPage(false)
+    }
+  }, [page])
 
   const handleFilterChange = (k, v) => {
     setFilters(f => ({ ...f, [k]: v }))
@@ -95,9 +110,14 @@ export default function BacklogDue() {
       search_val: '',
     }
     setFilters(defaultFilters)
+    setPage(1)
     setLoading(true)
-    api.get('/backlog-due', { params: defaultFilters })
-      .then(r => setData(r.data))
+    api.get('/backlog-due', { params: { ...defaultFilters, page: 1 } })
+      .then(r => {
+        setData(r.data.data ?? r.data)
+        setLastPage(r.data.last_page ?? 1)
+        setTotal(r.data.total ?? 0)
+      })
       .finally(() => setLoading(false))
   }
 
@@ -296,7 +316,7 @@ export default function BacklogDue() {
         {/* Row 3: Action buttons */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
           <button className="btn btn--outline btn--sm" style={{ width: '120px', height: '36px' }} onClick={resetFilters}>Reset</button>
-          <button className="btn btn--primary btn--sm" style={{ width: '160px', height: '36px' }} onClick={() => load(false)}>Apply Filters</button>
+          <button className="btn btn--primary btn--sm" style={{ width: '160px', height: '36px' }} onClick={() => load(false, 1)}>Apply Filters</button>
         </div>
       </div>
 
@@ -329,10 +349,10 @@ export default function BacklogDue() {
             placeholder={`Search ${filters.search_type === 'chassis' ? 'Chassis' : 'Engine'} Number...`}
             value={filters.search_val} 
             onChange={e => handleFilterChange('search_val', e.target.value)} 
-            onKeyDown={e => e.key === 'Enter' && load(false)}
+            onKeyDown={e => e.key === 'Enter' && load(false, 1)}
           />
         </div>
-        <button className="btn btn--primary btn--sm" onClick={() => load(false)}>
+        <button className="btn btn--primary btn--sm" onClick={() => load(false, 1)}>
           <Search size={14} /> Search
         </button>
       </div>
@@ -436,6 +456,15 @@ export default function BacklogDue() {
                 </tfoot>
               )}
             </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && data.length > 0 && (
+          <div style={{ padding: 16, display: 'flex', justifyContent: 'center', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn--outline btn--sm" disabled={page <= 1} onClick={() => { setPage(p => Math.max(1, p - 1)); setPendingPage(true) }}>Prev</button>
+            <span style={{ fontSize: 13 }}>Page {page} of {lastPage} ({total} records)</span>
+            <button className="btn btn--outline btn--sm" disabled={page >= lastPage} onClick={() => { setPage(p => p + 1); setPendingPage(true) }}>Next</button>
           </div>
         )}
       </div>

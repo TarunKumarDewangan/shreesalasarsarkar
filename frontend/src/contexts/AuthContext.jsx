@@ -1,13 +1,24 @@
-import { createContext, useContext, useState } from 'react'
-import api from '../api'
+import { createContext, useContext, useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import api, { setOnUnauthorized } from '../api'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
+  const navigate = useNavigate()
   const [token, setToken] = useState(() => localStorage.getItem('token'))
   const [user,  setUser]  = useState(() => {
     try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
   })
+
+  // Register SPA-friendly 401 handler once
+  useEffect(() => {
+    setOnUnauthorized(() => {
+      setToken(null)
+      setUser(null)
+      navigate('/login', { replace: true })
+    })
+  }, [navigate])
 
   const login = async (email, password) => {
     const { data } = await api.post('/login', { email, password })
@@ -26,6 +37,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('role')
     setToken(null)
     setUser(null)
+    navigate('/login', { replace: true })
   }
 
   return (

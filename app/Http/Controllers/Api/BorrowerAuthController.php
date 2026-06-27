@@ -32,7 +32,7 @@ class BorrowerAuthController extends Controller
 
         $msg = "नमस्ते *" . $borrower->name . "*,\n\n" .
                "आपका लॉगिन OTP *" . $otp . "* है। यह 10 मिनट के लिए मान्य है।\n\n" .
-               "लॉगिन करने के लिए यहाँ क्लिक करें: http://localhost:5173/borrower/login\n\n" .
+               "लॉगिन करने के लिए यहाँ क्लिक करें: " . config('app.frontend_url') . "/borrower/login\n\n" .
                "धन्यवाद!\n" .
                "*Shree Salasar Sarkar Finance*";
         

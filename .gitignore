@@ -22,3 +22,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Backups / sensitive data
+db_backup_corrupted/
+scratch/

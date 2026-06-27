@@ -10,6 +10,16 @@ use Carbon\Carbon;
 
 class CashbookController extends Controller
 {
+    /**
+     * Resolve the cbcode that should be used to scope backlog queries.
+     * Admin: no filter (null). Financer/Staff: their own cbcode.
+     */
+    private function userCbcode(\App\Models\User $user): ?string
+    {
+        if ($user->isAdmin()) return null;
+        return $user->cbcode ?? $user->finance_name ?? null;
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -18,16 +28,6 @@ class CashbookController extends Controller
         $startDate = $request->input('start_date') ?: Carbon::today()->startOfMonth()->toDateString();
         $endDate = $request->input('end_date') ?: Carbon::today()->endOfMonth()->toDateString();
         $type = strtolower($request->input('type', 'combine')); // combine, new, backlog
-
-        \Log::info("CashbookController Request Details", [
-            'user_id' => $user?->id,
-            'user_role' => $user?->role,
-            'effective_owner_id' => $effectiveOwnerId,
-            'start_date' => $startDate,
-            'end_date' => $endDate,
-            'type' => $type,
-            'all_inputs' => $request->all()
-        ]);
 
         // 1. Calculate Opening Balance (collections before $startDate)
         $openingBalance = 0;
@@ -46,9 +46,13 @@ class CashbookController extends Controller
         }
 
         if ($type === 'combine' || $type === 'backlog') {
-            // Backlog
+            // Backlog — scoped to the authenticated user's branch code
+            $userCbcode = $this->userCbcode($user);
             $backlogOpening = BacklogInstallment::where('status', 'PAID')
                 ->where('payment_date', '<', $startDate)
+                ->when($userCbcode, function($q) use ($userCbcode) {
+                    $q->whereHas('account', fn($aq) => $aq->where('cbcode', $userCbcode));
+                })
                 ->sum('paid_amount');
             $openingBalance += $backlogOpening;
         }
@@ -102,9 +106,13 @@ class CashbookController extends Controller
         }
 
         if ($type === 'combine' || $type === 'backlog') {
-            // 3. Fetch Backlog Collections within period
+            // 3. Fetch Backlog Collections within period — scoped to user's cbcode
+            $userCbcode = $this->userCbcode($user);
             $backlogCollections = BacklogInstallment::where('status', 'PAID')
                 ->whereBetween('payment_date', [$startDate, $endDate])
+                ->when($userCbcode, function($q) use ($userCbcode) {
+                    $q->whereHas('account', fn($aq) => $aq->where('cbcode', $userCbcode));
+                })
                 ->with('account')
                 ->get();
 
@@ -165,16 +173,6 @@ class CashbookController extends Controller
             'total_receipts' => $totalReceipts,
             'closing_balance' => $closingBalance,
             'transactions' => $rows,
-            'debug' => [
-                'db' => \DB::connection()->getDatabaseName(),
-                'user_id' => $user?->id,
-                'user_role' => $user?->role,
-                'start_date' => $startDate,
-                'end_date' => $endDate,
-                'type' => $type,
-                'backlog_count' => isset($backlogCollections) ? $backlogCollections->count() : 0,
-                'active_count' => isset($activeCollections) ? $activeCollections->count() : 0,
-            ]
         ]);
     }
 }

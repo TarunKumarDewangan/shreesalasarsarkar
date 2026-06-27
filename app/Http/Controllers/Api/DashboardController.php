@@ -18,13 +18,19 @@ class DashboardController extends Controller
         $financerId = $user->isStaff() ? $user->financer_id : $user->id;
         $staffId = $user->isStaff() ? $user->id : null;
         
-        $cacheKey = "dashboard_stats_{$financerId}" . ($staffId ? "_{$staffId}" : "");
+        if ($user->isAdmin()) {
+            $cacheKey = "dashboard_stats_admin";
+        } else {
+            $cacheKey = "dashboard_stats_{$financerId}" . ($staffId ? "_{$staffId}" : "");
+        }
 
         return \Illuminate\Support\Facades\Cache::remember($cacheKey, 600, function() use ($user, $financerId, $staffId) {
             $borrowerQ = Borrower::query();
             $loanQ     = Loan::query();
             
-            if ($staffId) {
+            if ($user->isAdmin()) {
+                // Admin gets global stats - no scoping required
+            } else if ($staffId) {
                 $borrowerQ->where('financer_id', $financerId)->where('recovery_man_id', $staffId);
                 $loanQ->where('financer_id', $financerId)->whereHas('borrower', function($q) use ($staffId) {
                     $q->where('recovery_man_id', $staffId);

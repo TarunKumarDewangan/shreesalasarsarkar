@@ -130,14 +130,7 @@ class RecoveryController extends Controller
             if ($installment && $installment->status !== 'PAID') {
                 $receiptNo = $recovery->receipt_no;
                 if (! $receiptNo) {
-                    $receiptPrefix = 'SSSF';
-                    $lastReceipt = \App\Models\Installment::where('receipt_no', 'like', $receiptPrefix . '%')->max('receipt_no');
-                    $nextNumber = 100;
-                    if ($lastReceipt) {
-                        $lastNum = (int)str_replace($receiptPrefix, '', $lastReceipt);
-                        $nextNumber = $lastNum + 1;
-                    }
-                    $receiptNo = $receiptPrefix . $nextNumber;
+                    $receiptNo = \App\Helpers\ReceiptHelper::generateReceiptNo();
                     $recovery->update(['receipt_no' => $receiptNo]);
                 }
 

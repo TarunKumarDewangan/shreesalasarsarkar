@@ -30,7 +30,8 @@ class SearchController extends Controller
         }
 
         if (!$user->isAdmin()) {
-            $query->where('financer_id', $user->id);
+            $effectiveOwnerId = $user->isStaff() ? $user->financer_id : $user->id;
+            $query->where('financer_id', $effectiveOwnerId);
         }
 
         $results = $query->take(10)->orderBy('id', 'desc')->get()->map(function($b) {

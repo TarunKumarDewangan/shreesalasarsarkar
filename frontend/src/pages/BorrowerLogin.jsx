@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Phone, Hash, ShieldCheck, ArrowRight, CheckCircle2 } from 'lucide-react'
 import api from '../api'
 
 export default function BorrowerLogin() {
+  const navigate = useNavigate()
   const [mobile, setMobile] = useState('')
   const [useOtp, setUseOtp] = useState(true)
   const [otpValue, setOtpValue] = useState('')
@@ -37,7 +39,7 @@ export default function BorrowerLogin() {
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify(res.data.borrower))
       localStorage.setItem('role', 'BORROWER')
-      window.location.href = '/borrower/dashboard'
+      navigate('/borrower/dashboard', { replace: true })
     } catch (ex) {
       setError(ex.response?.data?.message || 'Login failed')
     } finally {

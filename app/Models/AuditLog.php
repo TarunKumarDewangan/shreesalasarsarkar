@@ -15,6 +15,11 @@ class AuditLog extends Model
         'payload' => 'array'
     ];
 
+    public function user()
+    {
+        return $this->morphTo();
+    }
+
     public static function log(Request $request, string $action, Model $model = null, array $payload = []): void
     {
         $user = $request->user();

@@ -18,6 +18,7 @@ const VehicleEntry           = lazy(() => import('./pages/VehicleEntry'))
 const Reports                = lazy(() => import('./pages/Reports'))
 const SeizedVehicles         = lazy(() => import('./pages/SeizedVehicles'))
 const Financers              = lazy(() => import('./pages/admin/Financers'))
+const BackupRestore          = lazy(() => import('./pages/admin/BackupRestore'))
 const WhatsAppSettings       = lazy(() => import('./pages/WhatsAppSettings'))
 const Trash                  = lazy(() => import('./pages/Trash'))
 const Verifications          = lazy(() => import('./pages/Verifications'))
@@ -82,6 +83,7 @@ function AppRoutes() {
             <Route path="/combine/view-backlog" element={<CombineViewBacklog />} />
             <Route path="/admin/financers" element={<Financers />} />
             <Route path="/admin/audit-logs" element={<AuditLogs />} />
+            <Route path="/admin/backup" element={<BackupRestore />} />
           </Route>
         </Route>
         

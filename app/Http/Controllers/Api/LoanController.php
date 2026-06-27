@@ -79,7 +79,7 @@ class LoanController extends Controller
     {
         $data = $request->validate([
             'borrower_id'      => 'required|exists:borrowers,id',
-            'type'             => 'required|in:CASH,ONLINE',
+            'type'             => 'required|in:CASH,ONLINE,BANK',
             'agreement_date'   => 'required|date',
             'finance_amount'   => 'required|numeric|min:0',
             'agreement_amount' => 'nullable|numeric|min:0',
@@ -88,6 +88,10 @@ class LoanController extends Controller
             'interval'         => 'nullable|integer|min:1',
             'interest_rate'    => 'required|numeric|min:0',
         ]);
+
+        if ($data['type'] === 'BANK') {
+            $data['type'] = 'ONLINE';
+        }
 
         $user = $request->user();
         if ($user->isAdmin()) {
@@ -165,7 +169,7 @@ class LoanController extends Controller
                "किस्त राशि: *₹" . number_format((float)$loan->installment_amount, 2) . "* (हर *" . ($loan->interval > 1 ? $loan->interval . " महीने" : "महीने") . "* में)\n\n" .
                "कंपनी: *Shree Salasar Sarkar Finance*\n" .
                "संपर्क: *90744466566*\n\n" .
-               "अपने खाते की जानकारी के लिए यहाँ क्लिक करें: " . config('app.frontend_url', 'http://localhost:5173') . "/borrower/login\n" .
+               "अपने खाते की जानकारी के लिए यहाँ क्लिक करें: " . config('app.frontend_url') . "/borrower/login\n" .
                "धन्यवाद!";
         
         \App\Jobs\SendWhatsAppNotification::dispatch($loan->borrower->mobile, $msg, $loan->financer_id);
@@ -184,7 +188,7 @@ class LoanController extends Controller
         $this->authorize('update', $loan);
 
         $data = $request->validate([
-            'type'             => 'sometimes|in:CASH,ONLINE',
+            'type'             => 'sometimes|in:CASH,ONLINE,BANK',
             'agreement_date'   => 'sometimes|date',
             'finance_amount'   => 'sometimes|numeric|min:0',
             'agreement_amount' => 'nullable|numeric|min:0',
@@ -194,6 +198,10 @@ class LoanController extends Controller
             'interest_rate'    => 'sometimes|numeric|min:0',
             'status'           => 'sometimes|in:ACTIVE,CLOSED,SEIZED,FINAL,VERIFYING,REJECTED',
         ]);
+
+        if (isset($data['type']) && $data['type'] === 'BANK') {
+            $data['type'] = 'ONLINE';
+        }
 
         $data = Loan::calculate(array_merge($loan->toArray(), $data));
         

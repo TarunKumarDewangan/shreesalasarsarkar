@@ -43,7 +43,7 @@ class Installment extends Model
                "आपके *₹" . number_format($this->amount_paid) . "* का भुगतान रसीद नंबर *" . ($this->receipt_no ?? 'N/A') . "* के साथ प्राप्त हो गया है।\n" .
                "किस्त की देय तिथि: *" . $paidDueDate . "*\n" .
                "अगली किस्त की देय तिथि: *" . $nextDate . "*\n\n" .
-               "अपने खाते की जानकारी के लिए यहाँ क्लिक करें: http://localhost:5173/borrower/login\n\n" .
+               "अपने खाते की जानकारी के लिए यहाँ क्लिक करें: " . config('app.frontend_url') . "/borrower/login\n\n" .
                "धन्यवाद!\n" .
                "*" . ($loan->financer->finance_name ?? 'Shree Salasar Sarkar Finance') . "*";
 
@@ -62,7 +62,7 @@ class Installment extends Model
         $msg = "नमस्ते *" . $borrower->name . "*,\n\n" .
                "यह एक अनुस्मारक (Reminder) है कि आपकी किस्त राशि *₹" . number_format($this->amount_due) . "* जो दिनांक *" . $dueDate . "* को देय है।\n" .
                "कृपया समय पर भुगतान सुनिश्चित करें ताकि किसी भी विलंब शुल्क (Penalty) से बचा जा सके।\n\n" .
-               "अपने खाते की जानकारी के लिए यहाँ क्लिक करें: http://localhost:5173/borrower/login\n\n" .
+               "अपने खाते की जानकारी के लिए यहाँ क्लिक करें: " . config('app.frontend_url') . "/borrower/login\n\n" .
                "धन्यवाद!\n" .
                "*" . ($loan->financer->finance_name ?? 'Shree Salasar Sarkar Finance') . "*";
 

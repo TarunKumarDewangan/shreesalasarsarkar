@@ -30,6 +30,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::apiResource('financers', FinancerController::class)->except(['index']);
         Route::get('audit-logs', [\App\Http\Controllers\Api\AuditLogController::class, 'index']);
+
+        // Backup & Restore
+        Route::get('/backup/export',          [\App\Http\Controllers\Api\BackupController::class, 'export']);
+        Route::post('/backup/import',         [\App\Http\Controllers\Api\BackupController::class, 'import']);
+        Route::post('/backup/preview-import', [\App\Http\Controllers\Api\BackupController::class, 'previewImport']);
     });
     Route::get('financers', [FinancerController::class, 'index']);
 

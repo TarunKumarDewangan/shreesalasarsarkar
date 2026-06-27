@@ -285,7 +285,7 @@ class BacklogController extends Controller
         
         $totalInt = $account->interest_amount ?? 0;
         $totalMonths = $account->total_months ?? 1;
-        $monthlyInt = $totalInt / $totalMonths;
+        $monthlyInt = $totalMonths > 0 ? ($totalInt / $totalMonths) : 0;
         
         $interestFixed = ceil($monthlyInt); // Roundup
         $instAmt = $account->installment_amount ?: ($account->total_amount / ($account->total_months ?: 1));
@@ -314,147 +314,106 @@ class BacklogController extends Controller
 
     public function dueInstallments(Request $request)
     {
-        // Fetch all backlog accounts with their installments
-        $accounts = BacklogAccount::with(['installments' => function($q) {
-            $q->orderBy('due_date', 'asc');
-        }])->get();
+        // 1. Build the base query with filters that can be applied directly on backlog_accounts
+        $subQuery = BacklogAccount::query();
 
-        $data = [];
-
-        foreach ($accounts as $account) {
-            $total_paid = $account->installments->sum('paid_amount');
-            $current_balance = $account->total_amount - $total_paid;
-            
-            // Calculate due date (oldest pending, fallback to first/latest)
-            $oldestPending = $account->installments->where('status', 'PENDING')->first();
-            $due_date = $oldestPending ? $oldestPending->due_date : ($account->installments->first()?->due_date ?? null);
-            
-            // Agreement date is the due date of the first installment
-            $agreement_date = $account->installments->first()?->due_date ?? null;
-            
-            $inst_rate = (float)$account->installment_amount;
-            if ($inst_rate <= 0 && $account->total_months > 0) {
-                $inst_rate = $account->total_amount / $account->total_months;
-            }
-            
-            $due_inst = 0;
-            if ($inst_rate > 0) {
-                $due_inst = round($current_balance / $inst_rate, 1);
-            }
-
-            // Prepare record
-            $data[] = [
-                'id' => $account->id,
-                'sno' => $account->sno,
-                'fno' => $account->fno,
-                'customer_name' => $account->customer_name,
-                'father_name' => $account->father_name,
-                'mobile' => $account->mobile,
-                'vehicle_model' => $account->vehicle_model,
-                'vehicle_no' => $account->vehicle_no,
-                'chassis_no' => $account->chassis_no,
-                'engine_no' => $account->engine_no,
-                'vehicle_make' => $account->vehicle_make,
-                'zone' => $account->zone,
-                'cbcode' => $account->cbcode,
-                'total_months' => $account->total_months,
-                'installment_amount' => $account->installment_amount,
-                'finance_amount' => $account->finance_amount,
-                'total_amount' => $account->total_amount,
-                'type' => $account->type, // 'P', 'F', 'S'
-                'current_balance' => $current_balance,
-                'due_inst' => $due_inst,
-                'due_date' => $due_date,
-                'agreement_date' => $agreement_date,
-            ];
-        }
-
-        // Apply filters in PHP
-        $collection = collect($data);
-
-        // Filter: Folio range
         if ($request->filled('folio_start')) {
-            $collection = $collection->where('fno', '>=', (int)$request->folio_start);
+            $subQuery->where('fno', '>=', (int)$request->folio_start);
         }
         if ($request->filled('folio_end')) {
-            $collection = $collection->where('fno', '<=', (int)$request->folio_end);
+            $subQuery->where('fno', '<=', (int)$request->folio_end);
         }
-
-        // Filter: Financer (cbcode)
         if ($request->filled('financer') && $request->financer !== 'ALL') {
-            $collection = $collection->where('cbcode', $request->financer);
+            $subQuery->where('cbcode', $request->financer);
         }
-
-        // Filter: Zone
         if ($request->filled('zone') && $request->zone !== 'ALL') {
-            $collection = $collection->where('zone', $request->zone);
+            $subQuery->where('zone', $request->zone);
         }
-
-        // Filter: Model
         if ($request->filled('model') && $request->model !== 'ALL') {
-            $collection = $collection->where('vehicle_model', $request->model);
+            $subQuery->where('vehicle_model', $request->model);
         }
-
-        // Filter: Vehicle No
         if ($request->filled('vehicle_no') && $request->vehicle_no !== 'ALL') {
-            $collection = $collection->where('vehicle_no', $request->vehicle_no);
+            $subQuery->where('vehicle_no', $request->vehicle_no);
         }
-
-        // Filter: Make (vehicle_make) year range
         if ($request->filled('make_start')) {
-            $collection = $collection->where('vehicle_make', '>=', (int)$request->make_start);
+            $subQuery->where('vehicle_make', '>=', (int)$request->make_start);
         }
         if ($request->filled('make_end')) {
-            $collection = $collection->where('vehicle_make', '<=', (int)$request->make_end);
+            $subQuery->where('vehicle_make', '<=', (int)$request->make_end);
         }
-
-        // Filter: Due Months >=
-        if ($request->filled('due_months_min')) {
-            $collection = $collection->where('due_inst', '>=', (float)$request->due_months_min);
-        }
-
-        // Filter: Total Months range
         if ($request->filled('total_months_start')) {
-            $collection = $collection->where('total_months', '>=', (int)$request->total_months_start);
+            $subQuery->where('total_months', '>=', (int)$request->total_months_start);
         }
         if ($request->filled('total_months_end')) {
-            $collection = $collection->where('total_months', '<=', (int)$request->total_months_end);
+            $subQuery->where('total_months', '<=', (int)$request->total_months_end);
+        }
+        if ($request->filled('search_val')) {
+            $field = $request->search_type === 'engine' ? 'engine_no' : 'chassis_no';
+            $subQuery->where($field, 'like', "%{$request->search_val}%");
         }
 
-        // Filter: Due Date range
+        // 2. Select subqueries for computed columns
+        $totalPaidSub = BacklogInstallment::selectRaw('COALESCE(SUM(paid_amount), 0)')
+            ->whereColumn('backlog_account_id', 'backlog_accounts.id');
+        $subQuery->selectSub($totalPaidSub, 'total_paid');
+
+        $dueDatePendingSub = BacklogInstallment::select('due_date')
+            ->whereColumn('backlog_account_id', 'backlog_accounts.id')
+            ->where('status', 'PENDING')
+            ->orderBy('due_date', 'asc')
+            ->limit(1);
+        $subQuery->selectSub($dueDatePendingSub, 'due_date_pending');
+
+        $firstDueDateSub = BacklogInstallment::select('due_date')
+            ->whereColumn('backlog_account_id', 'backlog_accounts.id')
+            ->orderBy('due_date', 'asc')
+            ->limit(1);
+        $subQuery->selectSub($firstDueDateSub, 'first_due_date');
+
+        // Add all columns of backlog_accounts
+        $subQuery->addSelect('backlog_accounts.*');
+
+        // 3. Wrap in a derived query so we can filter/query against computed attributes in SQL
+        $derivedQuery = BacklogAccount::fromSub($subQuery, 'ba_derived')->withoutGlobalScopes();
+
+        // Add finalized computed attributes
+        $derivedQuery->addSelect([
+            'ba_derived.*',
+            \Illuminate\Support\Facades\DB::raw('(total_amount - total_paid) AS current_balance'),
+            \Illuminate\Support\Facades\DB::raw('COALESCE(due_date_pending, first_due_date) AS due_date'),
+            \Illuminate\Support\Facades\DB::raw('first_due_date AS agreement_date'),
+            \Illuminate\Support\Facades\DB::raw('(CASE WHEN installment_amount > 0 THEN installment_amount WHEN total_months > 0 THEN total_amount / total_months ELSE 0 END) AS inst_rate')
+        ]);
+        $derivedQuery->addSelect([
+            \Illuminate\Support\Facades\DB::raw('CASE WHEN (CASE WHEN installment_amount > 0 THEN installment_amount WHEN total_months > 0 THEN total_amount / total_months ELSE 0 END) > 0 THEN ROUND((total_amount - total_paid) / (CASE WHEN installment_amount > 0 THEN installment_amount WHEN total_months > 0 THEN total_amount / total_months ELSE 0 END), 1) ELSE 0 END AS due_inst')
+        ]);
+
+        // 4. Apply filters directly on the SQL query
+        if ($request->filled('due_months_min')) {
+            $derivedQuery->where(
+                \Illuminate\Support\Facades\DB::raw('CASE WHEN (CASE WHEN installment_amount > 0 THEN installment_amount WHEN total_months > 0 THEN total_amount / total_months ELSE 0 END) > 0 THEN ROUND((total_amount - total_paid) / (CASE WHEN installment_amount > 0 THEN installment_amount WHEN total_months > 0 THEN total_amount / total_months ELSE 0 END), 1) ELSE 0 END'),
+                '>=',
+                (float)$request->due_months_min
+            );
+        }
         if ($request->filled('due_date_start')) {
-            $collection = $collection->filter(function($item) use ($request) {
-                return $item['due_date'] >= $request->due_date_start;
-            });
+            $derivedQuery->where(\Illuminate\Support\Facades\DB::raw('COALESCE(due_date_pending, first_due_date)'), '>=', $request->due_date_start);
         }
         if ($request->filled('due_date_end')) {
-            $collection = $collection->filter(function($item) use ($request) {
-                return $item['due_date'] <= $request->due_date_end;
-            });
+            $derivedQuery->where(\Illuminate\Support\Facades\DB::raw('COALESCE(due_date_pending, first_due_date)'), '<=', $request->due_date_end);
         }
-
-        // Filter: Agreement Date range
         if ($request->filled('agreement_date_start')) {
-            $collection = $collection->filter(function($item) use ($request) {
-                return $item['agreement_date'] >= $request->agreement_date_start;
-            });
+            $derivedQuery->where('first_due_date', '>=', $request->agreement_date_start);
         }
         if ($request->filled('agreement_date_end')) {
-            $collection = $collection->filter(function($item) use ($request) {
-                return $item['agreement_date'] <= $request->agreement_date_end;
-            });
+            $derivedQuery->where('first_due_date', '<=', $request->agreement_date_end);
         }
 
-        // Filter: Search (Chassis or Engine)
-        if ($request->filled('search_val')) {
-            $searchType = $request->search_type === 'engine' ? 'engine_no' : 'chassis_no';
-            $val = strtolower($request->search_val);
-            $collection = $collection->filter(function($item) use ($searchType, $val) {
-                return str_contains(strtolower($item[$searchType] ?? ''), $val);
-            });
-        }
+        // 5. Order and Paginate
+        $perPage = min((int) $request->get('per_page', 50), 100);
+        $accounts = $derivedQuery->orderBy('fno', 'asc')->paginate($perPage);
 
-        return response()->json($collection->values()->all());
+        return response()->json($accounts);
     }
 
     public function destroy()

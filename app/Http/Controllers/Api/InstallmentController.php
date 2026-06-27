@@ -60,30 +60,13 @@ class InstallmentController extends Controller
         $amountDue = (float)$installment->amount_due;
         $netDue    = $amountDue + $penalty - $discount;
 
-        // ── Helper: find the next truly unused receipt number ──────────────
-        $generateReceipt = function() {
-            $prefix = 'SSSF';
-            $last   = \App\Models\Installment::where('receipt_no', 'like', $prefix . '%')
-                        ->orderByRaw('CAST(SUBSTRING(receipt_no, 5) AS UNSIGNED) DESC')
-                        ->lockForUpdate()
-                        ->value('receipt_no');
-            
-            $nextNum = 100;
-            if ($last) {
-                $lastNum = (int)substr($last, strlen($prefix));
-                $nextNum = $lastNum + 1;
-            }
-            
-            return $prefix . $nextNum;
-        };
-
         // ── Wrap everything in a transaction so partial failures roll back ──
         return \Illuminate\Support\Facades\DB::transaction(function() use (
             $installment, $data, $penalty, $discount, $amountCollected,
-            $amountDue, $netDue, $generateReceipt, $request, $user
+            $amountDue, $netDue, $request, $user
         ) {
             $strategy = $data['strategy'] ?? 'AUTO_SPLIT';
-            $receiptNo = !empty($data['receipt_no']) ? $data['receipt_no'] : $generateReceipt();
+            $receiptNo = !empty($data['receipt_no']) ? $data['receipt_no'] : \App\Helpers\ReceiptHelper::generateReceiptNo();
 
             // Mark this installment PAID
             $installment->update([
@@ -157,19 +140,45 @@ class InstallmentController extends Controller
     public function markPending(Request $request, Installment $installment)
     {
         $this->authorize('update', $installment->loan);
-        $installment->update([
-            'status'      => 'PENDING',
-            'paid_date'   => null,
-            'amount_paid' => 0,
-            'penalty'     => 0,
-            'discount'    => 0,
-            'method'      => null,
-            'receipt_no'  => null,
-        ]);
 
-        AuditLog::log($request, 'INSTALLMENT_UNPAID', $installment);
+        return \Illuminate\Support\Facades\DB::transaction(function() use ($request, $installment) {
+            // Capture the original receipt_no before clearing it
+            $originalReceipt = $installment->receipt_no;
 
-        return response()->json($installment->fresh());
+            // Reset the target installment
+            $installment->update([
+                'status'      => 'PENDING',
+                'paid_date'   => null,
+                'amount_paid' => 0,
+                'penalty'     => 0,
+                'discount'    => 0,
+                'method'      => null,
+                'receipt_no'  => null,
+                'notes'       => null,
+            ]);
+
+            // Reverse any auto-split siblings that were cascaded from this installment.
+            // By convention, markPaid stores: notes = 'Auto-paid from excess (ref: {receipt_no})'
+            if ($originalReceipt) {
+                $installment->loan->installments()
+                    ->where('status', 'PAID')
+                    ->where('notes', 'like', '%ref: ' . $originalReceipt . '%')
+                    ->update([
+                        'status'      => 'PENDING',
+                        'paid_date'   => null,
+                        'amount_paid' => 0,
+                        'penalty'     => 0,
+                        'discount'    => 0,
+                        'method'      => null,
+                        'receipt_no'  => null,
+                        'notes'       => null,
+                    ]);
+            }
+
+            AuditLog::log($request, 'INSTALLMENT_UNPAID', $installment);
+
+            return response()->json($installment->fresh());
+        });
     }
 
 
@@ -191,20 +200,7 @@ class InstallmentController extends Controller
             'interest_amount'  => 'nullable|numeric',
         ]);
 
-        $receiptNo = !empty($data['receipt_no']) ? $data['receipt_no'] : null;
-        if (!$receiptNo) {
-            $prefix = 'SSSF';
-            $last   = \App\Models\Installment::where('receipt_no', 'like', $prefix . '%')
-                        ->orderByRaw('CAST(SUBSTRING(receipt_no, 5) AS UNSIGNED) DESC')
-                        ->lockForUpdate()
-                        ->value('receipt_no');
-            $nextNum = 100;
-            if ($last) {
-                $lastNum = (int)substr($last, strlen($prefix));
-                $nextNum = $lastNum + 1;
-            }
-            $receiptNo = $prefix . $nextNum;
-        }
+        $receiptNo = !empty($data['receipt_no']) ? $data['receipt_no'] : \App\Helpers\ReceiptHelper::generateReceiptNo();
 
         $installment = $loan->installments()->create([
             'due_date'         => $data['due_date'] ?? $data['paid_date'],

@@ -64,7 +64,6 @@ class ReportController extends Controller
         }
 
         // --- Stats Calculation (Optimized) ---
-        // Use a more efficient subquery pattern for stats
         $filteredBorrowerIds = (clone $query)->select('id');
         
         $statQuery = Installment::whereIn('loan_id', function($q) use ($filteredBorrowerIds) {
@@ -75,11 +74,18 @@ class ReportController extends Controller
             $statQuery->whereBetween('due_date', [$start, $end]);
         }
 
+        $statsData = $statQuery->selectRaw("
+            COALESCE(SUM(amount_due), 0) as total_receivable,
+            COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount_paid ELSE 0 END), 0) as total_received,
+            COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount_due ELSE 0 END), 0) as total_pending,
+            COUNT(CASE WHEN status = 'PENDING' AND due_date < ? THEN 1 END) as overdue_count
+        ", [Carbon::today()->toDateString()])->first();
+
         $stats = [
-            'total_receivable' => (float)$statQuery->sum('amount_due'),
-            'total_received'   => (float)$statQuery->where('status', 'PAID')->sum('amount_paid'),
-            'total_pending'    => (float)$statQuery->where('status', 'PENDING')->sum('amount_due'),
-            'overdue_count'    => $statQuery->where('status', 'PENDING')->where('due_date', '<', Carbon::today())->count(),
+            'total_receivable' => (float)$statsData->total_receivable,
+            'total_received'   => (float)$statsData->total_received,
+            'total_pending'    => (float)$statsData->total_pending,
+            'overdue_count'    => (int)$statsData->overdue_count,
         ];
 
         // Pagination: 50 per page for reports

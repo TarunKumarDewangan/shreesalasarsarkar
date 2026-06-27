@@ -33,6 +33,7 @@ class SendDueReminders extends Command
         $date15 = Carbon::today()->addDays(15)->toDateString();
         $ins15 = Installment::where('status', 'PENDING')
             ->whereDate('due_date', $date15)
+            ->with(['loan.borrower'])
             ->get();
 
         $this->info("Found {$ins15->count()} installments due in 15 days ($date15).");
@@ -45,6 +46,7 @@ class SendDueReminders extends Command
         $date2 = Carbon::today()->addDays(2)->toDateString();
         $ins2 = Installment::where('status', 'PENDING')
             ->whereDate('due_date', $date2)
+            ->with(['loan.borrower'])
             ->get();
 
         $this->info("Found {$ins2->count()} installments due in 2 days ($date2).");

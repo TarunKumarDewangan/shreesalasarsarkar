@@ -9,6 +9,10 @@ const api = axios.create({
   headers: { 'Accept': 'application/json' },
 })
 
+// Callback for SPA-friendly 401 redirect (set by AuthContext)
+let _onUnauthorized = null
+export const setOnUnauthorized = (fn) => { _onUnauthorized = fn }
+
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
@@ -21,7 +25,10 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      window.location.href = '/login'
+      localStorage.removeItem('role')
+      if (_onUnauthorized) {
+        _onUnauthorized()
+      }
     }
     return Promise.reject(err)
   }

@@ -48,7 +48,8 @@ class BacklogInstallmentsImport implements ToModel, WithStartRow, WithBatchInser
         
         $totalInt = $account->interest_amount ?? 0;
         $totalMonths = $account->total_months ?? 1;
-        $monthlyInt = $totalInt / $totalMonths;
+        // Guard against division by zero if total_months is 0 in the database
+        $monthlyInt = $totalMonths > 0 ? ($totalInt / $totalMonths) : 0;
         
         $interestFixed = ceil($monthlyInt);
         $instAmt = $account->installment_amount ?: ($account->total_amount / ($account->total_months ?: 1));

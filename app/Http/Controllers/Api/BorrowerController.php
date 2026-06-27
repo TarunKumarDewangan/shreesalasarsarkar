@@ -246,6 +246,23 @@ class BorrowerController extends Controller
 
         $financer_id = $this->financer_id($request);
 
+        // Clean up any orphan borrower (which has no loans) to allow re-submission if loan creation failed
+        $existingBorrower = Borrower::withTrashed()
+            ->where('financer_id', $financer_id)
+            ->where('folio_prefix', $data['folio_prefix'])
+            ->where('folio_no', $data['folio_no'])
+            ->first();
+
+        if ($existingBorrower) {
+            if ($existingBorrower->loans()->count() === 0) {
+                $existingBorrower->vehicle()?->delete();
+                $existingBorrower->guarantor()?->delete();
+                $existingBorrower->forceDelete();
+            } else {
+                return response()->json(['message' => 'Folio number already exists for this financer.'], 422);
+            }
+        }
+
         try {
             $borrower = Borrower::create(array_merge(
                 collect($data)->except(['guarantor', 'vehicle'])->toArray(),

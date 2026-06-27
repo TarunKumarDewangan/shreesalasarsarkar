@@ -27,9 +27,9 @@ class TrashController extends Controller
             return $q;
         };
 
-        $borrowers = $queryFn(Borrower::query())->get();
-        $loans = $queryFn(Loan::query())->with('borrower')->get();
-        $recoveries = $queryFn(Recovery::query())->with(['borrower', 'staff'])->get();
+        $borrowers  = $queryFn(Borrower::query())->latest('deleted_at')->take(100)->get();
+        $loans      = $queryFn(Loan::query())->with('borrower')->latest('deleted_at')->take(100)->get();
+        $recoveries = $queryFn(Recovery::query())->with(['borrower', 'staff'])->latest('deleted_at')->take(100)->get();
 
         return response()->json([
             'borrowers'  => $borrowers,

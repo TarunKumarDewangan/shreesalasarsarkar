@@ -16,47 +16,62 @@ class GlobalSearchController extends Controller
             return response()->json(['results' => []]);
         }
 
+        $user = $request->user();
+        $effectiveOwnerId = $user->isStaff() ? $user->financer_id : $user->id;
+        $cbcode = $user->isAdmin() ? null : ($user->cbcode ?? $user->finance_name ?? null);
+
         $results = [];
 
         // 1. Search New Borrowers (Name, Mobile, Folio, Vehicle Reg)
-        $borrowers = Borrower::where(function($q) use ($query) {
+        $borrowersQuery = Borrower::where(function($q) use ($query) {
             $q->where('name', 'LIKE', "%$query%")
               ->orWhere('mobile', 'LIKE', "%$query%")
               ->orWhere('folio_no', 'LIKE', "%$query%")
               ->orWhereHas('vehicle', function($vq) use ($query) {
-                  $vq->where('reg_no', 'LIKE', "%$query%");
+                  $vq->where('vehicle_no', 'LIKE', "%$query%")
+                    ->orWhere('reg_no', 'LIKE', "%$query%");
               });
-        })
-        ->with(['latestLoan', 'vehicle'])
-        ->limit(10)
-        ->get();
+        });
+
+        if (!$user->isAdmin()) {
+            $borrowersQuery->where('financer_id', $effectiveOwnerId);
+        }
+
+        $borrowers = $borrowersQuery->with(['latestLoan', 'vehicle'])
+            ->limit(10)
+            ->get();
 
         foreach ($borrowers as $b) {
             $results[] = [
                 'type' => 'New Borrower',
                 'title' => $b->name,
                 'subtitle' => "FNO: {$b->folio_no} • {$b->mobile}",
-                'meta' => $b->vehicle->reg_no ?? 'No Vehicle',
+                'meta' => $b->vehicle->vehicle_no ?? ($b->vehicle->reg_no ?? 'No Vehicle'),
                 'url' => "/borrowers/{$b->id}",
                 'icon' => 'user'
             ];
         }
 
         // 2. Search Backlog Accounts
-        $backlog = BacklogAccount::where(function($q) use ($query) {
+        $backlogQuery = BacklogAccount::where(function($q) use ($query) {
             $q->where('customer_name', 'LIKE', "%$query%")
               ->orWhere('mobile', 'LIKE', "%$query%")
-              ->orWhere('folio_no', 'LIKE', "%$query%")
+              ->orWhere('fno', 'LIKE', "%$query%")
               ->orWhere('vehicle_no', 'LIKE', "%$query%");
-        })
-        ->limit(10)
-        ->get();
+        });
+
+        if (!$user->isAdmin() && $cbcode) {
+            $backlogQuery->where('cbcode', $cbcode);
+        }
+
+        $backlog = $backlogQuery->limit(10)
+            ->get();
 
         foreach ($backlog as $bl) {
             $results[] = [
                 'type' => 'Backlog',
                 'title' => $bl->customer_name,
-                'subtitle' => "FNO: {$bl->folio_no} • {$bl->mobile}",
+                'subtitle' => "FNO: {$bl->fno} • {$bl->mobile}",
                 'meta' => $bl->vehicle_no,
                 'url' => "/backlog/{$bl->id}",
                 'icon' => 'history'

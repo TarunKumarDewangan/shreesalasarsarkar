@@ -11,16 +11,18 @@ class BorrowerPolicy
     /**
      * Determine whether the user can view any models.
      */
-    public function viewAny(User $user): bool
+    public function viewAny($user): bool
     {
+        if (!$user instanceof User) return false;
         return true; // Filtering is handled in the controller query
     }
 
     /**
      * Determine whether the user can view the model.
      */
-    public function view(User $user, Borrower $borrower): bool
+    public function view($user, Borrower $borrower): bool
     {
+        if (!$user instanceof User) return false;
         if ($user->isAdmin()) return true;
         
         $effectiveOwnerId = $user->isStaff() ? $user->financer_id : $user->id;
@@ -30,40 +32,45 @@ class BorrowerPolicy
     /**
      * Determine whether the user can create models.
      */
-    public function create(User $user): bool
+    public function create($user): bool
     {
+        if (!$user instanceof User) return false;
         return true;
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, Borrower $borrower): bool
+    public function update($user, Borrower $borrower): bool
     {
+        if (!$user instanceof User) return false;
         return $this->view($user, $borrower);
     }
 
     /**
      * Determine whether the user can delete the model.
      */
-    public function delete(User $user, Borrower $borrower): bool
+    public function delete($user, Borrower $borrower): bool
     {
+        if (!$user instanceof User) return false;
         return $this->view($user, $borrower);
     }
 
     /**
      * Determine whether the user can restore the model.
      */
-    public function restore(User $user, Borrower $borrower): bool
+    public function restore($user, Borrower $borrower): bool
     {
+        if (!$user instanceof User) return false;
         return false;
     }
 
     /**
      * Determine whether the user can permanently delete the model.
      */
-    public function forceDelete(User $user, Borrower $borrower): bool
+    public function forceDelete($user, Borrower $borrower): bool
     {
+        if (!$user instanceof User) return false;
         return false;
     }
 }
