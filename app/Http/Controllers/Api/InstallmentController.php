@@ -123,7 +123,7 @@ class InstallmentController extends Controller
 
 
             if ($request->boolean('send_whatsapp') && $installment->loan->borrower?->mobile) {
-                $installment->sendPaymentWhatsApp();
+                \Illuminate\Support\Facades\DB::afterCommit(fn() => $installment->sendPaymentWhatsApp());
             }
 
             // Clear Dashboard Cache

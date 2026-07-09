@@ -35,6 +35,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/backup/export',          [\App\Http\Controllers\Api\BackupController::class, 'export']);
         Route::post('/backup/import',         [\App\Http\Controllers\Api\BackupController::class, 'import']);
         Route::post('/backup/preview-import', [\App\Http\Controllers\Api\BackupController::class, 'previewImport']);
+
+        // Wipes ALL backlog accounts/installments — admin only.
+        Route::delete('/backlog/clear', [\App\Http\Controllers\Api\BacklogController::class, 'destroy']);
     });
     Route::get('financers', [FinancerController::class, 'index']);
 
@@ -98,7 +101,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/backlog/{id}', [\App\Http\Controllers\Api\BacklogController::class, 'show']);
     Route::post('/backlog/upload-accounts', [\App\Http\Controllers\Api\BacklogController::class, 'uploadAccounts']);
     Route::post('/backlog/upload-installments', [\App\Http\Controllers\Api\BacklogController::class, 'uploadInstallments']);
-    Route::delete('/backlog/clear', [\App\Http\Controllers\Api\BacklogController::class, 'destroy']);
     Route::post('/backlog/{id}/payment', [\App\Http\Controllers\Api\BacklogController::class, 'addPayment']);
     Route::put('/backlog/{id}/assign-recovery-man', [\App\Http\Controllers\Api\BacklogController::class, 'assignRecoveryMan']);
     Route::patch('/backlog-installments/{id}', [\App\Http\Controllers\Api\BacklogController::class, 'updateInstallment']);
