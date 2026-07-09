@@ -79,7 +79,9 @@ class BacklogAccountsImport implements ToModel, WithStartRow, WithBatchInserts, 
             'hp_amount'       => $hp_amt,
             'interest_amount' => $interest_amt,
             'total_amount'    => $this->num($row[44] ?? ($famt + $interest_amt + $agreement_amt + $hp_amt)),
-            'interest_rate'   => round($interest_rate, 2),
+            // interest_rate is decimal(10,2); a near-zero finance_amount can blow this up
+            // and abort the whole batch insert with a MySQL out-of-range error, so clamp it.
+            'interest_rate'   => max(-99999999.99, min(99999999.99, round($interest_rate, 2))),
             'installment_amount' => $inst_amt,
             'type'            => $this->type,
             'is_active'       => true,

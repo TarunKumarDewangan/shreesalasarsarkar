@@ -105,7 +105,12 @@ class BacklogController extends Controller
             'type' => 'required|in:P,F'
         ]);
 
-        Excel::import(new BacklogAccountsImport($request->type), $request->file('file'));
+        try {
+            Excel::import(new BacklogAccountsImport($request->type), $request->file('file'));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Backlog accounts import failed', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Import failed: ' . $e->getMessage()], 422);
+        }
 
         return response()->json(['message' => 'Accounts imported successfully']);
     }
@@ -117,7 +122,12 @@ class BacklogController extends Controller
             'type' => 'required|in:P,F'
         ]);
 
-        Excel::import(new BacklogInstallmentsImport($request->type), $request->file('file'));
+        try {
+            Excel::import(new BacklogInstallmentsImport($request->type), $request->file('file'));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Backlog installments import failed', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Import failed: ' . $e->getMessage()], 422);
+        }
 
         return response()->json(['message' => 'Installments imported successfully']);
     }
