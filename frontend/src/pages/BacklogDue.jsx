@@ -33,7 +33,7 @@ export default function BacklogDue() {
     total_months_start: '',
     total_months_end: '',
     due_months_min: '0',
-    search_type: 'chassis', // 'chassis', 'engine', 'owner_name', or 'vehicle_no'
+    search_type: 'chassis', // 'chassis', 'engine', 'borrower_name', or 'vehicle_no'
     search_val: '',
   })
 
@@ -360,10 +360,10 @@ export default function BacklogDue() {
             <input
               type="radio"
               name="search_type"
-              checked={filters.search_type === 'owner_name'}
-              onChange={() => handleFilterChange('search_type', 'owner_name')}
+              checked={filters.search_type === 'borrower_name'}
+              onChange={() => handleFilterChange('search_type', 'borrower_name')}
             />
-            Owner Name
+            Borrower Name
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             <input
@@ -382,7 +382,7 @@ export default function BacklogDue() {
             placeholder={`Search ${
               filters.search_type === 'chassis' ? 'Chassis' :
               filters.search_type === 'engine' ? 'Engine' :
-              filters.search_type === 'owner_name' ? 'Owner Name' : 'Vehicle'
+              filters.search_type === 'borrower_name' ? 'Borrower Name' : 'Vehicle'
             }...`}
             value={filters.search_val}
             onChange={e => handleFilterChange('search_val', e.target.value)}

@@ -386,7 +386,7 @@ class BacklogController extends Controller
                 case 'engine':
                     $subQuery->where('engine_no', 'like', $searchVal);
                     break;
-                case 'owner_name':
+                case 'borrower_name':
                     $subQuery->where(function($q) use ($searchVal) {
                         $q->where('customer_name', 'like', $searchVal)
                           ->orWhere('father_name', 'like', $searchVal);
