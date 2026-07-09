@@ -15,55 +15,26 @@ use Carbon\Carbon;
 class BacklogController extends Controller
 {
     /**
-     * Resolve the cbcode that should scope this user's backlog queries.
-     * Admin: no filter (null). Financer/Staff: their own branch code.
+     * Load a BacklogAccount by id. `cbcode` is an internal legacy branch
+     * label carried over from Excel imports, not a per-financer ownership
+     * key (this deployment is single-tenant), so no ownership check here.
      */
-    private function userCbcode(\App\Models\User $user): ?string
+    private function resolveAccount($id): BacklogAccount
     {
-        if ($user->isAdmin()) return null;
-        return $user->cbcode ?? $user->finance_name ?? null;
+        return BacklogAccount::findOrFail($id);
     }
 
     /**
-     * Load a BacklogAccount and abort 403 if it doesn't belong to the
-     * requesting user's branch. Mirrors LoanPolicy/BorrowerPolicy::view.
+     * Load a BacklogInstallment with its account by id.
      */
-    private function resolveAccount($id, \App\Models\User $user): BacklogAccount
+    private function resolveInstallment($id): BacklogInstallment
     {
-        $account = BacklogAccount::findOrFail($id);
-        $scope = $this->userCbcode($user);
-
-        if ($scope !== null && $account->cbcode !== $scope) {
-            abort(403, 'Forbidden. This account does not belong to your branch.');
-        }
-
-        return $account;
-    }
-
-    /**
-     * Load a BacklogInstallment (with its account) and abort 403 if the
-     * owning account doesn't belong to the requesting user's branch.
-     */
-    private function resolveInstallment($id, \App\Models\User $user): BacklogInstallment
-    {
-        $installment = BacklogInstallment::with('account')->findOrFail($id);
-        $scope = $this->userCbcode($user);
-
-        if ($scope !== null && (!$installment->account || $installment->account->cbcode !== $scope)) {
-            abort(403, 'Forbidden. This account does not belong to your branch.');
-        }
-
-        return $installment;
+        return BacklogInstallment::with('account')->findOrFail($id);
     }
 
     public function index(Request $request)
     {
         $query = BacklogAccount::with('installments')->withCount('installments');
-
-        $scope = $this->userCbcode($request->user());
-        if ($scope !== null) {
-            $query->where('cbcode', $scope);
-        }
 
         if ($request->search) {
             $query->where('customer_name', 'like', "%{$request->search}%")
@@ -79,7 +50,7 @@ class BacklogController extends Controller
 
     public function show(Request $request, $id)
     {
-        $this->resolveAccount($id, $request->user());
+        $this->resolveAccount($id);
 
         $account = BacklogAccount::with(['installments' => function($q) {
             $q->orderBy('installment_no', 'asc');
@@ -150,7 +121,7 @@ class BacklogController extends Controller
             'im' => 'nullable|integer',
         ]);
 
-        $account = $this->resolveAccount($id, $request->user());
+        $account = $this->resolveAccount($id);
 
         $lastIns = $account->installments()->orderBy('installment_no', 'asc')->get()->last();
         $nextNo = ($lastIns ? $lastIns->installment_no : 0) + 1;
@@ -207,7 +178,7 @@ class BacklogController extends Controller
             'strategy' => 'nullable|string', // 'BAL' or 'AUTO_SPLIT'
         ]);
 
-        $installment = $this->resolveInstallment($id, $request->user());
+        $installment = $this->resolveInstallment($id);
 
         $strategy = $request->strategy ?? 'BAL';
         $paidAmt = (float)$request->amount;
@@ -269,7 +240,7 @@ class BacklogController extends Controller
 
     public function deleteInstallment(Request $request, $id)
     {
-        $installment = $this->resolveInstallment($id, $request->user());
+        $installment = $this->resolveInstallment($id);
         $accountId = $installment->backlog_account_id;
         \App\Models\AuditLog::log($request, 'BACKLOG_INSTALLMENT_DELETED', $installment, $installment->toArray());
         $installment->delete();
@@ -300,7 +271,7 @@ class BacklogController extends Controller
 
     public function seize(Request $request, $id)
     {
-        $account = $this->resolveAccount($id, $request->user());
+        $account = $this->resolveAccount($id);
         $account->type = 'S'; // 'S' for Seized
         $account->save();
         return response()->json(['message' => 'Vehicle seized successfully']);
@@ -314,7 +285,7 @@ class BacklogController extends Controller
             'mode' => 'nullable|string',
         ]);
 
-        $account = $this->resolveAccount($id, $request->user());
+        $account = $this->resolveAccount($id);
 
         $totalPaid = $account->installments()->sum('paid_amount');
         $balance = $account->total_amount - $totalPaid;
@@ -340,7 +311,7 @@ class BacklogController extends Controller
 
     public function recalculateAll(Request $request, $id)
     {
-        $this->resolveAccount($id, $request->user());
+        $this->resolveAccount($id);
         $account = BacklogAccount::with('installments')->findOrFail($id);
 
         $totalInt = $account->interest_amount ?? 0;
@@ -384,12 +355,7 @@ class BacklogController extends Controller
             $subQuery->where('fno', '<=', (int)$request->folio_end);
         }
 
-        // Non-admins are always scoped to their own branch; the `financer`
-        // request param is only honored for admins.
-        $scope = $this->userCbcode($request->user());
-        if ($scope !== null) {
-            $subQuery->where('cbcode', $scope);
-        } elseif ($request->filled('financer') && $request->financer !== 'ALL') {
+        if ($request->filled('financer') && $request->financer !== 'ALL') {
             $subQuery->where('cbcode', $request->financer);
         }
 
@@ -497,7 +463,7 @@ class BacklogController extends Controller
             'collection_date' => 'nullable|date',
         ]);
 
-        $account = $this->resolveAccount($id, $request->user());
+        $account = $this->resolveAccount($id);
         $account->update([
             'recovery_man_id' => $request->recovery_man_id,
             'collection_date' => $request->collection_date,

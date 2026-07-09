@@ -10,16 +10,6 @@ use Carbon\Carbon;
 
 class CashbookController extends Controller
 {
-    /**
-     * Resolve the cbcode that should be used to scope backlog queries.
-     * Admin: no filter (null). Financer/Staff: their own cbcode.
-     */
-    private function userCbcode(\App\Models\User $user): ?string
-    {
-        if ($user->isAdmin()) return null;
-        return $user->cbcode ?? $user->finance_name ?? null;
-    }
-
     public function index(Request $request)
     {
         $user = $request->user();
@@ -46,13 +36,9 @@ class CashbookController extends Controller
         }
 
         if ($type === 'combine' || $type === 'backlog') {
-            // Backlog — scoped to the authenticated user's branch code
-            $userCbcode = $this->userCbcode($user);
+            // Backlog data is single-tenant; cbcode is a legacy branch label, not a per-financer key.
             $backlogOpening = BacklogInstallment::where('status', 'PAID')
                 ->where('payment_date', '<', $startDate)
-                ->when($userCbcode, function($q) use ($userCbcode) {
-                    $q->whereHas('account', fn($aq) => $aq->where('cbcode', $userCbcode));
-                })
                 ->sum('paid_amount');
             $openingBalance += $backlogOpening;
         }
@@ -106,13 +92,9 @@ class CashbookController extends Controller
         }
 
         if ($type === 'combine' || $type === 'backlog') {
-            // 3. Fetch Backlog Collections within period — scoped to user's cbcode
-            $userCbcode = $this->userCbcode($user);
+            // 3. Fetch Backlog Collections within period
             $backlogCollections = BacklogInstallment::where('status', 'PAID')
                 ->whereBetween('payment_date', [$startDate, $endDate])
-                ->when($userCbcode, function($q) use ($userCbcode) {
-                    $q->whereHas('account', fn($aq) => $aq->where('cbcode', $userCbcode));
-                })
                 ->with('account')
                 ->get();
 

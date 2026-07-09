@@ -19,22 +19,10 @@ class CombineController extends Controller
         return $user->id;
     }
 
-    /**
-     * Resolve the branch code (cbcode) for scoping backlog queries.
-     * Returns null for admin (no restriction), or the user's cbcode.
-     */
-    private function userCbcode(Request $request): ?string
-    {
-        $user = $request->user();
-        if ($user->isAdmin()) return null;
-        return $user->cbcode ?? $user->finance_name ?? null;
-    }
-
     public function dueInstallments(Request $request)
     {
         $user = $request->user();
         $effectiveOwnerId = $user->isStaff() ? $user->financer_id : $user->id;
-        $cbcode = $this->userCbcode($request);
         $source = $request->get('source_filter', 'ALL');
 
         // 1. Build the Active (New) Query
@@ -168,10 +156,6 @@ class CombineController extends Controller
             ])
             ->whereNull('ba.deleted_at');
 
-        if ($cbcode) {
-            $oldQuery->where('ba.cbcode', $cbcode);
-        }
-
         // Apply filters to $oldQuery
         if ($request->filled('folio_start')) {
             $oldQuery->where('ba.fno', '>=', (int)$request->folio_start);
@@ -257,7 +241,6 @@ class CombineController extends Controller
     {
         $user = $request->user();
         $effectiveOwnerId = $user->isStaff() ? $user->financer_id : $user->id;
-        $cbcode = $this->userCbcode($request);
         $source = $request->get('source_filter', 'ALL');
 
         // 1. Build the Active (New) Borrower/Loan query
@@ -361,10 +344,6 @@ class CombineController extends Controller
                 \Illuminate\Support\Facades\DB::raw("ba.collection_date AS collection_date")
             ])
             ->whereNull('ba.deleted_at');
-
-        if ($cbcode) {
-            $oldQuery->where('ba.cbcode', $cbcode);
-        }
 
         if ($request->filled('search')) {
             $search = $request->search;
