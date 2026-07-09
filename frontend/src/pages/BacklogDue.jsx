@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import api from '../api'
 import { fmtCurrency, fmtDate } from '../utils'
 import { Printer, RefreshCw, Search, Calendar, Filter, Users, Car, MapPin, Hash, X } from 'lucide-react'
@@ -84,6 +84,21 @@ export default function BacklogDue() {
       setPendingPage(false)
     }
   }, [page])
+
+  // Live search: auto-run (debounced) as the user types or switches
+  // Chassis/Engine/Owner Name/Vehicle No., without needing to hit Search.
+  const isFirstSearchRun = useRef(true)
+  useEffect(() => {
+    if (isFirstSearchRun.current) {
+      isFirstSearchRun.current = false
+      return
+    }
+    const timer = setTimeout(() => {
+      setPage(1)
+      load(false, 1)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [filters.search_val, filters.search_type])
 
   const handleFilterChange = (k, v) => {
     setFilters(f => ({ ...f, [k]: v }))
