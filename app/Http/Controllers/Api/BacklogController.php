@@ -381,8 +381,23 @@ class BacklogController extends Controller
             $subQuery->where('total_months', '<=', (int)$request->total_months_end);
         }
         if ($request->filled('search_val')) {
-            $field = $request->search_type === 'engine' ? 'engine_no' : 'chassis_no';
-            $subQuery->where($field, 'like', "%{$request->search_val}%");
+            $searchVal = "%{$request->search_val}%";
+            switch ($request->search_type) {
+                case 'engine':
+                    $subQuery->where('engine_no', 'like', $searchVal);
+                    break;
+                case 'owner_name':
+                    $subQuery->where(function($q) use ($searchVal) {
+                        $q->where('customer_name', 'like', $searchVal)
+                          ->orWhere('father_name', 'like', $searchVal);
+                    });
+                    break;
+                case 'vehicle_no':
+                    $subQuery->where('vehicle_no', 'like', $searchVal);
+                    break;
+                default:
+                    $subQuery->where('chassis_no', 'like', $searchVal);
+            }
         }
 
         // 2. Select subqueries for computed columns

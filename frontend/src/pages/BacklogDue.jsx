@@ -33,7 +33,7 @@ export default function BacklogDue() {
     total_months_start: '',
     total_months_end: '',
     due_months_min: '0',
-    search_type: 'chassis', // 'chassis' or 'engine'
+    search_type: 'chassis', // 'chassis', 'engine', 'owner_name', or 'vehicle_no'
     search_val: '',
   })
 
@@ -321,34 +321,56 @@ export default function BacklogDue() {
       </div>
 
       {/* Bottom Search Bar (Chassis/Engine) */}
-      <div className="card no-print" style={{ padding: '12px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '24px', background: '#f8fafc' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="card no-print" style={{ padding: '12px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', background: '#f8fafc' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            <input 
-              type="radio" 
-              name="search_type" 
-              checked={filters.search_type === 'chassis'} 
-              onChange={() => handleFilterChange('search_type', 'chassis')} 
+            <input
+              type="radio"
+              name="search_type"
+              checked={filters.search_type === 'chassis'}
+              onChange={() => handleFilterChange('search_type', 'chassis')}
             />
             Chassis No.
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            <input 
-              type="radio" 
-              name="search_type" 
-              checked={filters.search_type === 'engine'} 
-              onChange={() => handleFilterChange('search_type', 'engine')} 
+            <input
+              type="radio"
+              name="search_type"
+              checked={filters.search_type === 'engine'}
+              onChange={() => handleFilterChange('search_type', 'engine')}
             />
             Engine No.
           </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="search_type"
+              checked={filters.search_type === 'owner_name'}
+              onChange={() => handleFilterChange('search_type', 'owner_name')}
+            />
+            Owner Name
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="search_type"
+              checked={filters.search_type === 'vehicle_no'}
+              onChange={() => handleFilterChange('search_type', 'vehicle_no')}
+            />
+            Vehicle No.
+          </label>
         </div>
         <div style={{ flex: '1', maxWidth: '300px', display: 'flex', gap: '8px' }}>
-          <input 
-            type="text" 
-            className="form-control form-control--sm" 
-            placeholder={`Search ${filters.search_type === 'chassis' ? 'Chassis' : 'Engine'} Number...`}
-            value={filters.search_val} 
-            onChange={e => handleFilterChange('search_val', e.target.value)} 
+          <input
+            type="text"
+            className="form-control form-control--sm"
+            placeholder={`Search ${
+              filters.search_type === 'chassis' ? 'Chassis' :
+              filters.search_type === 'engine' ? 'Engine' :
+              filters.search_type === 'owner_name' ? 'Owner Name' : 'Vehicle'
+            }...`}
+            value={filters.search_val}
+            onChange={e => handleFilterChange('search_val', e.target.value)}
             onKeyDown={e => e.key === 'Enter' && load(false, 1)}
           />
         </div>
