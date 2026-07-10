@@ -53,12 +53,19 @@ export default function BacklogDue() {
     setMetadata({ financers, zones, models })
   }
 
+  // Guards against out-of-order responses: if an older request (e.g. fired
+  // mid-typing) resolves after a newer one, its response is discarded
+  // instead of overwriting the latest results.
+  const requestIdRef = useRef(0)
+
   const load = (isInitial = false, pageOverride = null) => {
     const currentPage = pageOverride ?? page
+    const requestId = ++requestIdRef.current
     setLoading(true)
     const params = { ...(isInitial ? {} : filters), page: currentPage }
     api.get('/backlog-due', { params })
       .then(r => {
+        if (requestId !== requestIdRef.current) return
         const items = r.data.data ?? r.data
         setData(items)
         setLastPage(r.data.last_page ?? 1)
@@ -68,9 +75,12 @@ export default function BacklogDue() {
         }
       })
       .catch(e => {
+        if (requestId !== requestIdRef.current) return
         alert('Failed to fetch backlog due list: ' + (e.response?.data?.message || e.message))
       })
-      .finally(() => setLoading(false))
+      .finally(() => {
+        if (requestId === requestIdRef.current) setLoading(false)
+      })
   }
 
   useEffect(() => {
