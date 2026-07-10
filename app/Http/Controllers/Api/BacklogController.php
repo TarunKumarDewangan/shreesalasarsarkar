@@ -382,7 +382,9 @@ class BacklogController extends Controller
         }
         if ($request->filled('search_val')) {
             $searchVal = "%{$request->search_val}%";
-            switch ($request->search_type) {
+            // The global UppercaseStrings middleware uppercases all request input,
+            // so match search_type case-insensitively rather than against literal lowercase strings.
+            switch (strtolower((string) $request->search_type)) {
                 case 'engine':
                     $subQuery->where('engine_no', 'like', $searchVal);
                     break;
